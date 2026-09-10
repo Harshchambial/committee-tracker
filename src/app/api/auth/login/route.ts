@@ -22,7 +22,8 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: true,
         user: {
-          name: settings.payeeName || 'Admin / Organizer',
+          name: settings.adminName || settings.payeeName || 'Admin / Organizer',
+          phone: settings.adminPhone,
           role: 'ADMIN'
         }
       });

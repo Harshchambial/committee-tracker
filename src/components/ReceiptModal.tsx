@@ -147,7 +147,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
             </div>
             <div className="text-right">
               <div className="font-bold text-slate-800">Authorized Signatory</div>
-              <div className="text-[10px] text-slate-400">{settings?.payeeName || 'Committee Admin'}</div>
+              <div className="text-[10px] text-slate-400">{settings?.adminName || settings?.payeeName || 'Committee Admin'}</div>
             </div>
           </div>
         </div>

@@ -21,6 +21,8 @@ const DEFAULT_SETTINGS: CommitteeSettings = {
   monthlyAmount: 1000,
   upiId: 'samiti@upi',
   payeeName: 'Vikas Samiti Treasury',
+  adminName: 'Rajesh Sharma',
+  adminPhone: '9876543210',
   adminPin: '1234',
   currency: 'INR',
   startMonth: 1,
@@ -525,12 +527,34 @@ export async function getSettings(): Promise<CommitteeSettings> {
     try {
       const { data, error } = await supabase.from('committee_settings').select('*').limit(1).single();
       if (!error && data) {
+        let adminName = data.admin_name;
+        let adminPhone = data.admin_phone;
+
+        if (!adminName) {
+          try {
+            const { data: adminMember } = await supabase
+              .from('members')
+              .select('name, phone')
+              .eq('role', 'ADMIN')
+              .limit(1)
+              .maybeSingle();
+            if (adminMember) {
+              adminName = adminMember.name;
+              if (!adminPhone) adminPhone = adminMember.phone;
+            }
+          } catch (mErr) {
+            // ignore member fetch error
+          }
+        }
+
         return {
           committeeName: data.committee_name || DEFAULT_SETTINGS.committeeName,
           tagline: data.tagline || DEFAULT_SETTINGS.tagline,
           monthlyAmount: Number(data.monthly_amount) || 1000,
           upiId: data.upi_id || DEFAULT_SETTINGS.upiId,
           payeeName: data.payee_name || DEFAULT_SETTINGS.payeeName,
+          adminName: adminName || DEFAULT_SETTINGS.adminName,
+          adminPhone: adminPhone || DEFAULT_SETTINGS.adminPhone,
           adminPin: data.admin_pin || '1234',
           currency: data.currency || 'INR',
           startMonth: data.start_month || 1,
@@ -544,7 +568,13 @@ export async function getSettings(): Promise<CommitteeSettings> {
     }
   }
   const db = getDatabase();
-  return db.settings;
+  const adminMem = db.members.find(m => m.role === 'ADMIN');
+  return {
+    ...DEFAULT_SETTINGS,
+    ...db.settings,
+    adminName: db.settings.adminName || adminMem?.name || DEFAULT_SETTINGS.adminName,
+    adminPhone: db.settings.adminPhone || adminMem?.phone || DEFAULT_SETTINGS.adminPhone
+  };
 }
 
 export async function updateSettings(updates: Partial<CommitteeSettings>, providedPin: string): Promise<CommitteeSettings> {
@@ -562,7 +592,22 @@ export async function updateSettings(updates: Partial<CommitteeSettings>, provid
       if (updates.upiId !== undefined) updatePayload.upi_id = updates.upiId;
       if (updates.payeeName !== undefined) updatePayload.payee_name = updates.payeeName;
       if (updates.adminPin !== undefined) updatePayload.admin_pin = updates.adminPin;
-      await supabase.from('committee_settings').update(updatePayload).eq('id', 'default');
+      if (updates.adminName !== undefined) updatePayload.admin_name = updates.adminName;
+      if (updates.adminPhone !== undefined) updatePayload.admin_phone = updates.adminPhone;
+
+      const { error } = await supabase.from('committee_settings').update(updatePayload).eq('id', 'default');
+      if (error) {
+        delete updatePayload.admin_name;
+        delete updatePayload.admin_phone;
+        await supabase.from('committee_settings').update(updatePayload).eq('id', 'default');
+      }
+
+      if (updates.adminName || updates.adminPhone) {
+        const memberPayload: any = {};
+        if (updates.adminName) memberPayload.name = updates.adminName;
+        if (updates.adminPhone) memberPayload.phone = updates.adminPhone;
+        await supabase.from('members').update(memberPayload).eq('role', 'ADMIN');
+      }
     } catch (e) {
       console.error('Supabase update settings error:', e);
     }
@@ -570,6 +615,15 @@ export async function updateSettings(updates: Partial<CommitteeSettings>, provid
 
   const db = getDatabase();
   db.settings = { ...db.settings, ...updates };
+
+  if (updates.adminName || updates.adminPhone) {
+    const adminMem = db.members.find(m => m.role === 'ADMIN');
+    if (adminMem) {
+      if (updates.adminName) adminMem.name = updates.adminName;
+      if (updates.adminPhone) adminMem.phone = updates.adminPhone;
+    }
+  }
+
   saveDatabase(db);
   return db.settings;
 }

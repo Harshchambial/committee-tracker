@@ -11,6 +11,7 @@ import { AdminPortal } from '@/components/AdminPortal';
 import { ReceiptModal } from '@/components/ReceiptModal';
 import { LoginScreen } from '@/components/LoginScreen';
 import { ChangePasswordModal } from '@/components/ChangePasswordModal';
+import { AdminProfileModal } from '@/components/AdminProfileModal';
 import { 
   TreasurySummary, 
   CommitteeSettings, 
@@ -47,6 +48,7 @@ export default function Home() {
   const [payModalInitialYear, setPayModalInitialYear] = useState<number | undefined>();
   const [receiptPayment, setReceiptPayment] = useState<PaymentRecord | null>(null);
   const [isChangePassOpen, setIsChangePassOpen] = useState<boolean>(false);
+  const [isAdminProfileOpen, setIsAdminProfileOpen] = useState<boolean>(false);
 
   // Load saved user session on mount
   useEffect(() => {
@@ -130,6 +132,28 @@ export default function Home() {
     }
   };
 
+  const handleAdminProfileUpdated = (updatedUser: AuthUser, newPin?: string) => {
+    setCurrentUser(prev => prev ? { ...prev, name: updatedUser.name, phone: updatedUser.phone } : updatedUser);
+    if (newPin) {
+      setAdminPin(newPin);
+      try {
+        localStorage.setItem('samiti_admin_pin', newPin);
+      } catch (e) {
+        console.error('Failed to save updated pin:', e);
+      }
+    }
+    try {
+      const savedUser = localStorage.getItem('samiti_auth_user');
+      if (savedUser) {
+        const parsed = JSON.parse(savedUser);
+        localStorage.setItem('samiti_auth_user', JSON.stringify({ ...parsed, name: updatedUser.name, phone: updatedUser.phone }));
+      }
+    } catch (e) {
+      console.error('Failed to update session:', e);
+    }
+    fetchData();
+  };
+
   const handleOpenPayModal = (memberId?: string, month?: number, yearVal?: number) => {
     const targetMemberId = memberId || (currentUser?.role === 'MEMBER' ? currentUser.id : undefined);
     setPayModalInitialMemberId(targetMemberId);
@@ -195,6 +219,7 @@ export default function Home() {
         currentUser={currentUser}
         onLogout={handleLogout}
         onOpenChangePassword={() => setIsChangePassOpen(true)}
+        onOpenAdminProfile={() => setIsAdminProfileOpen(true)}
         pendingApprovals={summary?.pendingApprovalsCount || 0}
       />
 
@@ -264,6 +289,7 @@ export default function Home() {
                 settings={settings}
                 summary={summary}
                 onRefreshData={fetchData}
+                onAdminProfileUpdated={handleAdminProfileUpdated}
               />
             )}
           </>
@@ -315,6 +341,16 @@ export default function Home() {
         payment={receiptPayment}
         settings={settings}
         onClose={() => setReceiptPayment(null)}
+      />
+
+      {/* Admin Profile Modal */}
+      <AdminProfileModal
+        isOpen={isAdminProfileOpen}
+        onClose={() => setIsAdminProfileOpen(false)}
+        adminPin={adminPin}
+        currentUser={currentUser}
+        settingsPhone={settings?.adminPhone}
+        onProfileUpdated={handleAdminProfileUpdated}
       />
 
       {/* Change Password Modal */}

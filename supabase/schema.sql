@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS committee_settings (
   payee_name TEXT NOT NULL DEFAULT 'Vikas Samiti Treasury',
   admin_pin TEXT NOT NULL DEFAULT '1234',
   currency TEXT DEFAULT 'INR',
+  admin_name TEXT DEFAULT 'Rajesh Sharma',
+  admin_phone TEXT DEFAULT '9876543210',
   start_month INT DEFAULT 1,
   start_year INT DEFAULT 2026,
   reminder_template_hindi TEXT,
@@ -20,9 +22,13 @@ CREATE TABLE IF NOT EXISTS committee_settings (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Migration support for existing tables:
+ALTER TABLE committee_settings ADD COLUMN IF NOT EXISTS admin_name TEXT DEFAULT 'Rajesh Sharma';
+ALTER TABLE committee_settings ADD COLUMN IF NOT EXISTS admin_phone TEXT DEFAULT '9876543210';
+
 -- Insert Default Settings if empty
-INSERT INTO committee_settings (id, committee_name, tagline, monthly_amount, upi_id, payee_name, admin_pin)
-VALUES ('default', 'Vikas Sahayog Samiti', 'Building Community Trust & Shared Prosperity', 1000, 'samiti@upi', 'Vikas Samiti Treasury', '1234')
+INSERT INTO committee_settings (id, committee_name, tagline, monthly_amount, upi_id, payee_name, admin_name, admin_phone, admin_pin)
+VALUES ('default', 'Vikas Sahayog Samiti', 'Building Community Trust & Shared Prosperity', 1000, 'samiti@upi', 'Vikas Samiti Treasury', 'Rajesh Sharma', '9876543210', '1234')
 ON CONFLICT (id) DO NOTHING;
 
 -- 2. Create Members Table

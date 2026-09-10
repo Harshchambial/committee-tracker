@@ -5,6 +5,8 @@
     "monthlyAmount": 1000,
     "upiId": "samiti@upi",
     "payeeName": "Vikas Samiti Treasury",
+    "adminName": "Rajesh Sharma",
+    "adminPhone": "9876543210",
     "adminPin": "1234",
     "currency": "INR",
     "startMonth": 1,

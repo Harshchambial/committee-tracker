@@ -58,6 +58,8 @@ export interface CommitteeSettings {
   upiId: string; // e.g. father@upi
   payeeName: string; // Account holder name
   adminPin: string; // 4-6 digit PIN or password
+  adminName?: string; // Admin / Organizer full name
+  adminPhone?: string; // Admin contact phone
   currency: string;
   startMonth: number;
   startYear: number;

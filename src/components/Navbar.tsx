@@ -23,7 +23,8 @@ interface NavbarProps {
   settings: CommitteeSettings | null;
   currentUser: AuthUser | null;
   onLogout: () => void;
-  onOpenChangePassword: () => void;
+  onOpenChangePassword?: () => void;
+  onOpenAdminProfile?: () => void;
   pendingApprovals: number;
 }
 
@@ -35,6 +36,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
   onLogout,
   onOpenChangePassword,
+  onOpenAdminProfile,
   pendingApprovals
 }) => {
   const isAdmin = currentUser?.role === 'ADMIN';
@@ -99,33 +101,45 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               {/* User Identity Chip */}
               {currentUser && (
-                <div className="hidden sm:flex items-center gap-2 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-xl">
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-white ${
+                <button
+                  type="button"
+                  onClick={isAdmin ? onOpenAdminProfile : undefined}
+                  className={`flex items-center gap-1.5 sm:gap-2 bg-slate-50 border border-slate-200/80 px-2 sm:px-2.5 py-1 rounded-xl transition text-left ${
+                    isAdmin ? 'hover:bg-amber-50 hover:border-amber-300 cursor-pointer' : 'cursor-default'
+                  }`}
+                  title={isAdmin ? "Click to change Admin Name & Password" : currentUser.name}
+                >
+                  <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center text-xs font-black text-white ${
                     isAdmin ? 'bg-amber-600' : 'bg-emerald-600'
                   }`}>
                     {currentUser.name.charAt(0)}
                   </div>
                   <div className="text-left text-xs">
-                    <div className="font-bold text-slate-900 leading-tight max-w-[110px] truncate">{currentUser.name}</div>
-                    <div className="text-[10px] text-slate-400 font-semibold">{isAdmin ? 'Admin' : 'Member'}</div>
+                    <div className="font-bold text-slate-900 leading-tight max-w-[85px] sm:max-w-[120px] truncate">{currentUser.name}</div>
+                    <div className="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
+                      <span>{isAdmin ? 'Admin' : 'Member'}</span>
+                      {isAdmin && <span className="text-amber-600 font-bold text-[9px] hidden sm:inline">• Edit Name</span>}
+                    </div>
                   </div>
-                </div>
+                </button>
               )}
 
-              {/* Change Password Button (for Admin) */}
-              {isAdmin && (
+              {/* Admin Profile & Password Button */}
+              {isAdmin && onOpenAdminProfile && (
                 <button
-                  onClick={onOpenChangePassword}
-                  className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1 border border-slate-200 transition cursor-pointer"
-                  title="Change Admin Password / PIN"
+                  type="button"
+                  onClick={onOpenAdminProfile}
+                  className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold flex items-center gap-1 border border-amber-200 transition cursor-pointer"
+                  title="Edit Admin Name & Password"
                 >
-                  <KeyRound className="w-3.5 h-3.5 text-amber-600" />
-                  <span className="hidden sm:inline">Change PIN</span>
+                  <UserIcon className="w-3.5 h-3.5 text-amber-700" />
+                  <span className="hidden sm:inline">Admin Profile</span>
                 </button>
               )}
 
               {/* Logout Button */}
               <button
+                type="button"
                 onClick={onLogout}
                 className="inline-flex items-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs font-bold rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-600 border border-slate-200 transition cursor-pointer"
                 title="Sign out of committee portal"

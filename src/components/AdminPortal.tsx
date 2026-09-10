@@ -41,6 +41,7 @@ interface AdminPortalProps {
   settings: CommitteeSettings | null;
   summary: TreasurySummary | null;
   onRefreshData: () => void;
+  onAdminProfileUpdated?: (updatedUser: import('@/types').AuthUser, newPin?: string) => void;
 }
 
 const MONTHS = [
@@ -58,7 +59,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   expenses,
   settings,
   summary,
-  onRefreshData
+  onRefreshData,
+  onAdminProfileUpdated
 }) => {
   // Login PIN state
   const [pinInput, setPinInput] = useState('');
@@ -100,7 +102,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [settingsUpiId, setSettingsUpiId] = useState(settings?.upiId || '');
   const [settingsPayeeName, setSettingsPayeeName] = useState(settings?.payeeName || '');
   const [settingsMonthlyAmount, setSettingsMonthlyAmount] = useState(settings?.monthlyAmount || 1000);
+  const [settingsAdminName, setSettingsAdminName] = useState(settings?.adminName || '');
+  const [settingsAdminPhone, setSettingsAdminPhone] = useState(settings?.adminPhone || '');
   const [newAdminPin, setNewAdminPin] = useState('');
+
+  React.useEffect(() => {
+    if (settings) {
+      setSettingsCommitteeName(settings.committeeName || '');
+      setSettingsTagline(settings.tagline || '');
+      setSettingsUpiId(settings.upiId || '');
+      setSettingsPayeeName(settings.payeeName || '');
+      setSettingsMonthlyAmount(settings.monthlyAmount || 1000);
+      setSettingsAdminName(settings.adminName || '');
+      setSettingsAdminPhone(settings.adminPhone || '');
+    }
+  }, [settings]);
 
   // Pending approval payments
   const pendingPayments = payments.filter(p => p.status === 'PENDING_APPROVAL');
@@ -142,7 +158,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           paymentId,
           action,
           adminPin,
-          verifiedBy: 'Father (Admin)'
+          verifiedBy: settings?.adminName || 'Father (Admin)'
         })
       });
       const data = await res.json();
@@ -280,6 +296,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         tagline: settingsTagline,
         upiId: settingsUpiId,
         payeeName: settingsPayeeName,
+        adminName: settingsAdminName.trim(),
+        adminPhone: settingsAdminPhone.trim(),
         monthlyAmount: Number(settingsMonthlyAmount)
       };
       if (newAdminPin && newAdminPin.trim().length >= 4) {
@@ -295,6 +313,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       if (!res.ok) throw new Error(data.error);
 
       setFeedbackMessage({ type: 'success', text: 'Settings updated successfully!' });
+      if (onAdminProfileUpdated) {
+        onAdminProfileUpdated({
+          name: settingsAdminName.trim() || 'Admin',
+          phone: settingsAdminPhone.trim(),
+          role: 'ADMIN'
+        }, updates.adminPin);
+      }
       onRefreshData();
     } catch (err: any) {
       setFeedbackMessage({ type: 'error', text: err.message });
@@ -907,6 +932,41 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             </p>
 
             <form onSubmit={handleUpdateSettings} className="space-y-4">
+              {/* Admin Identity Box */}
+              <div className="p-3.5 bg-amber-50/70 rounded-xl border border-amber-200 space-y-3">
+                <div className="flex items-center gap-1.5 text-xs font-black text-amber-900 uppercase">
+                  <User className="w-4 h-4 text-amber-700" />
+                  <span>Admin Identity & Details</span>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    Admin / Organizer Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Rajesh Sharma"
+                    value={settingsAdminName}
+                    onChange={(e) => setSettingsAdminName(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold text-slate-900"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    Your father&apos;s name will appear on the top header, login welcome, and receipts.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    Admin Mobile Number (Optional)
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder="e.g. 9876543210"
+                    value={settingsAdminPhone}
+                    onChange={(e) => setSettingsAdminPhone(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-mono"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Committee Name</label>
                 <input
