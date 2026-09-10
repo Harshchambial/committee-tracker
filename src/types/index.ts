@@ -20,6 +20,7 @@ export interface Member {
   status: 'ACTIVE' | 'INACTIVE';
   role: 'MEMBER' | 'ADMIN';
   notes?: string;
+  pin?: string;
 }
 
 export interface PaymentRecord {
@@ -56,7 +57,7 @@ export interface CommitteeSettings {
   monthlyAmount: number; // e.g. 1000
   upiId: string; // e.g. father@upi
   payeeName: string; // Account holder name
-  adminPin: string; // 4-6 digit PIN
+  adminPin: string; // 4-6 digit PIN or password
   currency: string;
   startMonth: number;
   startYear: number;
@@ -97,4 +98,12 @@ export interface MemberMatrixRow {
   totalPaid: number;
   totalDue: number;
   months: Record<number, MemberMonthlyStatus>; // key is month 1-12
+}
+
+export interface AuthUser {
+  id?: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  role: 'ADMIN' | 'MEMBER';
 }

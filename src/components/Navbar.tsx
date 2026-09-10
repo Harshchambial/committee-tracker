@@ -10,18 +10,20 @@ import {
   UserCheck, 
   ReceiptIndianRupee, 
   ShieldCheck, 
-  Lock, 
-  Unlock 
+  LogOut,
+  KeyRound,
+  User as UserIcon
 } from 'lucide-react';
-import { CommitteeSettings, TreasurySummary } from '@/types';
+import { CommitteeSettings, TreasurySummary, AuthUser } from '@/types';
 
 interface NavbarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   summary: TreasurySummary | null;
   settings: CommitteeSettings | null;
-  isAdminLoggedIn: boolean;
-  onAdminClick: () => void;
+  currentUser: AuthUser | null;
+  onLogout: () => void;
+  onOpenChangePassword: () => void;
   pendingApprovals: number;
 }
 
@@ -30,10 +32,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveTab,
   summary,
   settings,
-  isAdminLoggedIn,
-  onAdminClick,
+  currentUser,
+  onLogout,
+  onOpenChangePassword,
   pendingApprovals
 }) => {
+  const isAdmin = currentUser?.role === 'ADMIN';
+
   const desktopTabs = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'matrix', label: 'Payment Matrix', icon: Table2 },
@@ -66,7 +71,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <h1 className="text-sm sm:text-xl font-black text-slate-900 tracking-tight leading-none truncate max-w-[140px] sm:max-w-md">
+                  <h1 className="text-sm sm:text-xl font-black text-slate-900 tracking-tight leading-none truncate max-w-[130px] sm:max-w-xs">
                     {settings?.committeeName || 'Committee Fund'}
                   </h1>
                   <span className="inline-flex items-center px-1.5 py-0.2 rounded-md text-[10px] sm:text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
@@ -79,10 +84,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             </div>
 
-            {/* Top Right: Balance & Admin */}
-            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-              {/* Net Treasury Balance Pill */}
-              <div className="flex items-center bg-slate-100/90 px-2.5 py-1 sm:px-3.5 sm:py-1.5 rounded-xl border border-slate-200">
+            {/* Right Side: User Profile & Actions */}
+            <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+              {/* Net Treasury Balance */}
+              <div className="flex items-center bg-slate-100/90 px-2 sm:px-3.5 py-1 sm:py-1.5 rounded-xl border border-slate-200">
                 <div className="flex flex-col text-right">
                   <span className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-500 leading-none">Balance</span>
                   <span className="text-xs sm:text-base font-black text-emerald-600 flex items-center justify-end leading-tight mt-0.5">
@@ -92,36 +97,46 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               </div>
 
-              {/* Admin Button */}
+              {/* User Identity Chip */}
+              {currentUser && (
+                <div className="hidden sm:flex items-center gap-2 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-xl">
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-white ${
+                    isAdmin ? 'bg-amber-600' : 'bg-emerald-600'
+                  }`}>
+                    {currentUser.name.charAt(0)}
+                  </div>
+                  <div className="text-left text-xs">
+                    <div className="font-bold text-slate-900 leading-tight max-w-[110px] truncate">{currentUser.name}</div>
+                    <div className="text-[10px] text-slate-400 font-semibold">{isAdmin ? 'Admin' : 'Member'}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Change Password Button (for Admin) */}
+              {isAdmin && (
+                <button
+                  onClick={onOpenChangePassword}
+                  className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1 border border-slate-200 transition cursor-pointer"
+                  title="Change Admin Password / PIN"
+                >
+                  <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                  <span className="hidden sm:inline">Change PIN</span>
+                </button>
+              )}
+
+              {/* Logout Button */}
               <button
-                onClick={onAdminClick}
-                className={`relative inline-flex items-center gap-1 px-2.5 py-1.5 sm:px-4 sm:py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
-                  isAdminLoggedIn
-                    ? 'bg-amber-600 text-white hover:bg-amber-700 shadow-xs'
-                    : 'bg-slate-900 text-white hover:bg-slate-800'
-                }`}
+                onClick={onLogout}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs font-bold rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-600 border border-slate-200 transition cursor-pointer"
+                title="Sign out of committee portal"
               >
-                {isAdminLoggedIn ? (
-                  <>
-                    <Unlock className="w-3.5 h-3.5 text-amber-200" />
-                    <span className="hidden sm:inline">Admin</span>
-                  </>
-                ) : (
-                  <>
-                    <Lock className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="hidden sm:inline">Admin Login</span>
-                  </>
-                )}
-                {pendingApprovals > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-extrabold w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center border-2 border-white animate-pulse">
-                    {pendingApprovals}
-                  </span>
-                )}
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Logout</span>
               </button>
             </div>
           </div>
 
-          {/* Desktop Tab Navigation (Hidden on Mobile) */}
+          {/* Desktop Tab Navigation */}
           <div className="hidden sm:flex items-center gap-1 overflow-x-auto no-scrollbar border-t border-slate-100 py-2">
             {desktopTabs.map(tab => {
               const Icon = tab.icon;
@@ -144,7 +159,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               );
             })}
 
-            {isAdminLoggedIn && (
+            {isAdmin && (
               <button
                 onClick={() => setActiveTab('admin')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition cursor-pointer ml-auto ${
@@ -166,7 +181,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </header>
 
-      {/* Mobile Bottom Navigation Bar (PhonePe / GPay Style) */}
+      {/* Mobile Bottom Navigation Bar */}
       <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-lg border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] px-2 py-1 pb-safe">
         <div className="flex items-center justify-around">
           {mobileTabs.map(tab => {
@@ -206,7 +221,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             );
           })}
 
-          {isAdminLoggedIn && (
+          {isAdmin && (
             <button
               onClick={() => setActiveTab('admin')}
               className={`flex flex-col items-center justify-center py-1 px-2 rounded-lg transition cursor-pointer relative ${
