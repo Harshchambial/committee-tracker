@@ -1,69 +1,252 @@
-import Image from "next/image";
+'use client';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { Navbar } from '@/components/Navbar';
+import { TreasuryOverview } from '@/components/TreasuryOverview';
+import { PaymentMatrix } from '@/components/PaymentMatrix';
+import { PayDuesModal } from '@/components/PayDuesModal';
+import { MyContributions } from '@/components/MyContributions';
+import { FundUtilization } from '@/components/FundUtilization';
+import { AdminPortal } from '@/components/AdminPortal';
+import { ReceiptModal } from '@/components/ReceiptModal';
+import { 
+  TreasurySummary, 
+  CommitteeSettings, 
+  Member, 
+  PaymentRecord, 
+  ExpenseRecord, 
+  MemberMatrixRow 
+} from '@/types';
+import { ShieldCheck, Heart, RefreshCw } from 'lucide-react';
 
 export default function Home() {
+  const [activeTab, setActiveTab] = useState<string>('overview');
+  const [year, setYear] = useState<number>(new Date().getFullYear());
+
+  // Data states
+  const [summary, setSummary] = useState<TreasurySummary | null>(null);
+  const [settings, setSettings] = useState<CommitteeSettings | null>(null);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [matrix, setMatrix] = useState<MemberMatrixRow[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Admin state
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(false);
+  const [adminPin, setAdminPin] = useState<string>('');
+
+  // Modals state
+  const [isPayModalOpen, setIsPayModalOpen] = useState<boolean>(false);
+  const [payModalInitialMemberId, setPayModalInitialMemberId] = useState<string | undefined>();
+  const [payModalInitialMonth, setPayModalInitialMonth] = useState<number | undefined>();
+  const [payModalInitialYear, setPayModalInitialYear] = useState<number | undefined>();
+  const [receiptPayment, setReceiptPayment] = useState<PaymentRecord | null>(null);
+
+  // Fetch all data
+  const fetchData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const [treasuryRes, membersRes, paymentsRes, matrixRes, expensesRes] = await Promise.all([
+        fetch('/api/treasury'),
+        fetch('/api/members'),
+        fetch('/api/payments'),
+        fetch(`/api/matrix?year=${year}`),
+        fetch('/api/expenses')
+      ]);
+
+      const treasuryData = await treasuryRes.json();
+      const membersData = await membersRes.json();
+      const paymentsData = await paymentsRes.json();
+      const matrixData = await matrixRes.json();
+      const expensesData = await expensesRes.json();
+
+      setSummary(treasuryData.summary || null);
+      setSettings(treasuryData.settings || null);
+      setMembers(membersData.members || []);
+      setPayments(paymentsData.payments || []);
+      setMatrix(matrixData.matrix || []);
+      setExpenses(expensesData.expenses || []);
+    } catch (error) {
+      console.error('Failed to fetch committee data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [year]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Handlers
+  const handleOpenPayModal = (memberId?: string, month?: number, yearVal?: number) => {
+    setPayModalInitialMemberId(memberId);
+    setPayModalInitialMonth(month);
+    setPayModalInitialYear(yearVal);
+    setIsPayModalOpen(true);
+  };
+
+  const handleTabChange = (tabId: string) => {
+    if (tabId === 'pay') {
+      handleOpenPayModal();
+    } else {
+      setActiveTab(tabId);
+    }
+  };
+
+  const handleAdminLoginSuccess = (pin: string) => {
+    setIsAdminLoggedIn(true);
+    setAdminPin(pin);
+    setActiveTab('admin');
+  };
+
+  const handleAdminLogout = () => {
+    setIsAdminLoggedIn(false);
+    setAdminPin('');
+    setActiveTab('overview');
+  };
+
+  const handleDeleteExpense = async (expenseId: string) => {
+    if (!isAdminLoggedIn || !adminPin) return;
+    if (!confirm('Are you sure you want to delete this expense record?')) return;
+
+    try {
+      const res = await fetch(`/api/expenses?id=${expenseId}&adminPin=${adminPin}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        fetchData();
+      }
+    } catch (e) {
+      console.error('Delete expense error:', e);
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+    <div className="min-h-screen bg-slate-100/70 flex flex-col font-sans antialiased text-slate-900">
+      {/* Top Navigation */}
+      <Navbar
+        activeTab={activeTab}
+        setActiveTab={handleTabChange}
+        summary={summary}
+        settings={settings}
+        isAdminLoggedIn={isAdminLoggedIn}
+        onAdminClick={() => setActiveTab('admin')}
+        pendingApprovals={summary?.pendingApprovalsCount || 0}
+      />
+
+      {/* Main Container */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        {isLoading && !summary ? (
+          <div className="flex flex-col items-center justify-center py-24 space-y-4">
+            <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin" />
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Loading Committee Treasury Ledger...
+            </p>
+          </div>
+        ) : (
+          <>
+            {activeTab === 'overview' && (
+              <TreasuryOverview
+                summary={summary}
+                settings={settings}
+                onPayClick={() => handleOpenPayModal()}
+                onMatrixClick={() => setActiveTab('matrix')}
+                onExpensesClick={() => setActiveTab('expenses')}
+              />
+            )}
+
+            {activeTab === 'matrix' && (
+              <PaymentMatrix
+                matrix={matrix}
+                year={year}
+                setYear={setYear}
+                settings={settings}
+                onSelectPaymentForReceipt={(payment) => setReceiptPayment(payment)}
+                onPayForMember={(memberId, month, yearVal) => handleOpenPayModal(memberId, month, yearVal)}
+                isAdminLoggedIn={isAdminLoggedIn}
+                onOpenAdminVerify={() => setActiveTab('admin')}
+              />
+            )}
+
+            {activeTab === 'my-ledger' && (
+              <MyContributions
+                members={members}
+                payments={payments}
+                settings={settings}
+                onPayDues={(memberId, month, yearVal) => handleOpenPayModal(memberId, month, yearVal)}
+                onViewReceipt={(payment) => setReceiptPayment(payment)}
+              />
+            )}
+
+            {activeTab === 'expenses' && (
+              <FundUtilization
+                expenses={expenses}
+                summary={summary}
+                isAdminLoggedIn={isAdminLoggedIn}
+                onAddExpenseClick={() => setActiveTab('admin')}
+                onDeleteExpense={handleDeleteExpense}
+              />
+            )}
+
+            {activeTab === 'admin' && (
+              <AdminPortal
+                isAdminLoggedIn={isAdminLoggedIn}
+                onLoginSuccess={handleAdminLoginSuccess}
+                onLogout={handleAdminLogout}
+                adminPin={adminPin}
+                members={members}
+                payments={payments}
+                expenses={expenses}
+                settings={settings}
+                summary={summary}
+                onRefreshData={fetchData}
+              />
+            )}
+          </>
+        )}
       </main>
+
+      {/* Footer */}
+      <footer className="bg-white border-t border-slate-200 py-6 mt-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <span>{settings?.committeeName || 'Committee'} Transparency Portal • Built with trust & precision</span>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <span className="font-mono text-[11px] bg-slate-100 px-2 py-1 rounded-md text-slate-600">
+              Contribution: ₹{settings?.monthlyAmount || 1000}/mo
+            </span>
+            <button
+              onClick={fetchData}
+              className="hover:text-emerald-700 flex items-center gap-1 font-semibold transition cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Refresh Data
+            </button>
+          </div>
+        </div>
+      </footer>
+
+      {/* Global Modals */}
+      <PayDuesModal
+        isOpen={isPayModalOpen}
+        onClose={() => setIsPayModalOpen(false)}
+        members={members}
+        settings={settings}
+        initialMemberId={payModalInitialMemberId}
+        initialMonth={payModalInitialMonth}
+        initialYear={payModalInitialYear}
+        onPaymentSuccess={fetchData}
+      />
+
+      <ReceiptModal
+        payment={receiptPayment}
+        settings={settings}
+        onClose={() => setReceiptPayment(null)}
+      />
     </div>
   );
 }
