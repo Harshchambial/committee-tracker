@@ -6,14 +6,17 @@ export async function GET() {
     return NextResponse.json({ error: 'Supabase not configured' });
   }
 
-  const selectRes = await supabase.from('members').select('*');
-  const updateRes = await supabase.from('members').update({ name: 'Narinder Singh' }).eq('id', 'mem_1').select();
+  // Test insert
+  const insertRes = await supabase.from('members').insert({
+    id: 'test_' + Date.now(),
+    name: 'Test Name',
+    phone: '9999999999',
+    role: 'MEMBER',
+    status: 'ACTIVE'
+  }).select();
 
   return NextResponse.json({
-    selectCount: selectRes.data?.length,
-    selectError: selectRes.error,
-    firstMember: selectRes.data?.[0],
-    updateData: updateRes.data,
-    updateError: updateRes.error
+    insertData: insertRes.data,
+    insertError: insertRes.error
   });
 }
