@@ -18,9 +18,11 @@ import {
   Phone, 
   User, 
   Trash2,
+  Edit3,
   ReceiptIndianRupee,
   Clock
 } from 'lucide-react';
+import { EditMemberModal } from '@/components/EditMemberModal';
 import { 
   Member, 
   PaymentRecord, 
@@ -87,6 +89,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [newMemberPhone, setNewMemberPhone] = useState('');
   const [newMemberRole, setNewMemberRole] = useState<'MEMBER' | 'ADMIN'>('MEMBER');
   const [newMemberNotes, setNewMemberNotes] = useState('');
+  const [newMemberHasPaid, setNewMemberHasPaid] = useState(false);
+  const [newMemberPaidMonth, setNewMemberPaidMonth] = useState(new Date().getMonth() + 1);
+  const [newMemberPaidYear, setNewMemberPaidYear] = useState(new Date().getFullYear());
+  const [newMemberPaidMethod, setNewMemberPaidMethod] = useState<'CASH' | 'UPI_QR'>('CASH');
+
+  // Edit Member Modal state
+  const [selectedMemberToEdit, setSelectedMemberToEdit] = useState<Member | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Add Expense form state
   const [expenseTitle, setExpenseTitle] = useState('');
@@ -230,16 +240,80 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           phone: newMemberPhone,
           role: newMemberRole,
           notes: newMemberNotes,
-          adminPin
+          adminPin,
+          hasPaid: newMemberHasPaid,
+          paidMonth: newMemberPaidMonth,
+          paidYear: newMemberPaidYear,
+          paidMethod: newMemberPaidMethod,
+          paidAmount: settings?.monthlyAmount || 1000
         })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      setFeedbackMessage({ type: 'success', text: `Member "${newMemberName}" added successfully!` });
+      if (newMemberHasPaid) {
+        confetti({ particleCount: 60, spread: 60 });
+      }
+
+      setFeedbackMessage({ 
+        type: 'success', 
+        text: data.message || `Member "${newMemberName}" added successfully!` 
+      });
       setNewMemberName('');
       setNewMemberPhone('');
       setNewMemberNotes('');
+      setNewMemberHasPaid(false);
+      onRefreshData();
+    } catch (err: any) {
+      setFeedbackMessage({ type: 'error', text: err.message });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Delete Member
+  const handleDeleteMember = async (memberId: string, memberName: string) => {
+    if (!confirm(`Are you sure you want to permanently delete "${memberName}"? All contributions linked to this member will also be deleted.`)) {
+      return;
+    }
+    setActionLoading(true);
+    setFeedbackMessage(null);
+
+    try {
+      const res = await fetch(`/api/members?id=${memberId}&adminPin=${adminPin}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      setFeedbackMessage({ type: 'success', text: `Member "${memberName}" deleted successfully.` });
+      onRefreshData();
+    } catch (err: any) {
+      setFeedbackMessage({ type: 'error', text: err.message });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Reset / Wipe Dummy Test Data
+  const handleResetDummyData = async () => {
+    if (!confirm("⚠️ CAUTION: This will wipe all test payments, dummy members, and demo expenses, leaving only your father as Admin. Are you sure you want to start fresh?")) {
+      return;
+    }
+    setActionLoading(true);
+    setFeedbackMessage(null);
+
+    try {
+      const res = await fetch('/api/admin/reset-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminPin })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      confetti({ particleCount: 70, spread: 70 });
+      setFeedbackMessage({ type: 'success', text: data.message });
       onRefreshData();
     } catch (err: any) {
       setFeedbackMessage({ type: 'error', text: err.message });
@@ -868,12 +942,63 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 />
               </div>
 
+              {/* Initial Contribution Payment Option */}
+              <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-2.5">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={newMemberHasPaid}
+                    onChange={(e) => setNewMemberHasPaid(e.target.checked)}
+                    className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                  />
+                  <span className="text-xs font-bold text-emerald-900">
+                    Has this member already paid initial contribution?
+                  </span>
+                </label>
+
+                {newMemberHasPaid && (
+                  <div className="space-y-2 pt-2 border-t border-emerald-200/70 animate-in fade-in duration-150">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold text-emerald-800 uppercase mb-0.5">Month</label>
+                        <select
+                          value={newMemberPaidMonth}
+                          onChange={(e) => setNewMemberPaidMonth(Number(e.target.value))}
+                          className="w-full p-2 bg-white rounded-lg border border-emerald-300 text-xs font-bold"
+                        >
+                          {MONTHS.map((m, idx) => (
+                            <option key={idx + 1} value={idx + 1}>{m}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-emerald-800 uppercase mb-0.5">Payment Method</label>
+                        <select
+                          value={newMemberPaidMethod}
+                          onChange={(e) => setNewMemberPaidMethod(e.target.value as any)}
+                          className="w-full p-2 bg-white rounded-lg border border-emerald-300 text-xs font-bold"
+                        >
+                          <option value="CASH">Cash in Hand</option>
+                          <option value="UPI_QR">UPI / Online</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] text-emerald-700 font-semibold px-1">
+                      <span>Amount: ₹{settings?.monthlyAmount || 1000}</span>
+                      <span className="text-emerald-800">Auto-Verified ✓</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <button
                 type="submit"
                 disabled={actionLoading}
                 className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition cursor-pointer disabled:opacity-50"
               >
-                {actionLoading ? 'Adding...' : 'Add Member'}
+                {actionLoading ? 'Adding...' : (newMemberHasPaid ? 'Add Member & Record Payment' : 'Add Member')}
               </button>
             </form>
           </div>
@@ -910,6 +1035,32 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         {member.notes && <span>• {member.notes}</span>}
                       </div>
                     </div>
+                  </div>
+
+                  {/* Member Action Buttons */}
+                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedMemberToEdit(member);
+                        setIsEditModalOpen(true);
+                      }}
+                      className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1 transition cursor-pointer"
+                      title={`Edit ${member.name}`}
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-slate-600" />
+                      <span className="hidden sm:inline">Edit</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteMember(member.id, member.name)}
+                      className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center gap-1 transition cursor-pointer"
+                      title={`Delete ${member.name}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                      <span className="hidden sm:inline">Delete</span>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1072,8 +1223,41 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               </p>
             </div>
           </div>
+
+          {/* Danger Zone: Wipe Test Data */}
+          <div className="lg:col-span-2 bg-rose-50/70 rounded-2xl p-5 border border-rose-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <h4 className="font-extrabold text-rose-900 text-sm flex items-center gap-1.5">
+                <Trash2 className="w-4 h-4 text-rose-600" />
+                <span>Wipe Dummy Test Data (Clean Slate)</span>
+              </h4>
+              <p className="text-xs text-rose-700 max-w-xl">
+                Delete all sample members (Sunil, Ramesh, Anil, etc.), test payments, and demo expenses with 1 click. Keeps your father (<strong>{settings?.adminName || 'Narinder Singh'}</strong>) as sole Admin.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleResetDummyData}
+              disabled={actionLoading}
+              className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/20 transition cursor-pointer shrink-0 disabled:opacity-50"
+            >
+              {actionLoading ? 'Cleaning...' : 'Wipe All Test Data Now'}
+            </button>
+          </div>
         </div>
       )}
+
+      {/* Edit Member Modal */}
+      <EditMemberModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setSelectedMemberToEdit(null);
+        }}
+        member={selectedMemberToEdit}
+        adminPin={adminPin}
+        onMemberUpdated={onRefreshData}
+      />
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAllMembers, addMember, updateMember, deleteMember, verifyAdminPin } from '@/lib/store';
+import { getAllMembers, addMember, updateMember, deleteMember, verifyAdminPin, logOfflinePayment, getSettings } from '@/lib/store';
 
 export async function GET() {
   try {
@@ -35,7 +35,32 @@ export async function POST(request: Request) {
       notes: notes?.trim()
     });
 
-    return NextResponse.json({ member: newMember, message: 'Member added successfully' }, { status: 201 });
+    let initialPayment = null;
+    if (body.hasPaid) {
+      const settings = await getSettings();
+      const pMonth = body.paidMonth ? parseInt(body.paidMonth, 10) : (now.getMonth() + 1);
+      const pYear = body.paidYear ? parseInt(body.paidYear, 10) : now.getFullYear();
+      const pMethod = body.paidMethod || 'CASH';
+      const pAmount = body.paidAmount ? parseFloat(body.paidAmount) : settings.monthlyAmount;
+
+      initialPayment = await logOfflinePayment({
+        memberId: newMember.id,
+        month: pMonth,
+        year: pYear,
+        amount: pAmount,
+        method: pMethod,
+        notes: body.paidNotes || 'Initial contribution recorded at registration',
+        verifiedBy: settings.adminName || 'Admin'
+      });
+    }
+
+    return NextResponse.json({ 
+      member: newMember, 
+      payment: initialPayment,
+      message: initialPayment 
+        ? `Member added and initial payment recorded for ${newMember.name}!` 
+        : 'Member added successfully' 
+    }, { status: 201 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Failed to add member' }, { status: 500 });
   }

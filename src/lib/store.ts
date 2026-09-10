@@ -20,8 +20,8 @@ const DEFAULT_SETTINGS: CommitteeSettings = {
   tagline: 'Building Community Trust & Shared Prosperity',
   monthlyAmount: 1000,
   upiId: 'samiti@upi',
-  payeeName: 'Vikas Samiti Treasury',
-  adminName: 'Rajesh Sharma',
+  payeeName: 'Narinder Singh',
+  adminName: 'Narinder Singh',
   adminPhone: '9876543210',
   adminPin: '1234',
   currency: 'INR',
@@ -32,60 +32,13 @@ const DEFAULT_SETTINGS: CommitteeSettings = {
 };
 
 const INITIAL_MEMBERS: Member[] = [
-  { id: 'mem_1', name: 'Rajesh Sharma', phone: '9876543210', joinedMonth: 1, joinedYear: 2026, status: 'ACTIVE', role: 'ADMIN', notes: 'Committee President / Organizer' },
-  { id: 'mem_2', name: 'Sunil Verma', phone: '9876543211', joinedMonth: 1, joinedYear: 2026, status: 'ACTIVE', role: 'MEMBER' },
-  { id: 'mem_3', name: 'Ramesh Gupta', phone: '9876543212', joinedMonth: 1, joinedYear: 2026, status: 'ACTIVE', role: 'MEMBER' },
-  { id: 'mem_4', name: 'Anil Kumar', phone: '9876543213', joinedMonth: 1, joinedYear: 2026, status: 'ACTIVE', role: 'MEMBER' },
-  { id: 'mem_5', name: 'Manoj Tiwari', phone: '9876543214', joinedMonth: 1, joinedYear: 2026, status: 'ACTIVE', role: 'MEMBER' },
-  { id: 'mem_6', name: 'Suresh Patel', phone: '9876543215', joinedMonth: 1, joinedYear: 2026, status: 'ACTIVE', role: 'MEMBER' },
-  { id: 'mem_7', name: 'Deepak Singh', phone: '9876543216', joinedMonth: 1, joinedYear: 2026, status: 'ACTIVE', role: 'MEMBER' },
-  { id: 'mem_8', name: 'Sanjay Joshi', phone: '9876543217', joinedMonth: 1, joinedYear: 2026, status: 'ACTIVE', role: 'MEMBER' },
-  { id: 'mem_9', name: 'Vikram Chauhan', phone: '9876543218', joinedMonth: 1, joinedYear: 2026, status: 'ACTIVE', role: 'MEMBER' },
-  { id: 'mem_10', name: 'Rakesh Agarwal', phone: '9876543219', joinedMonth: 1, joinedYear: 2026, status: 'ACTIVE', role: 'MEMBER' },
+  { id: 'mem_1', name: 'Narinder Singh', phone: '9876543210', joinedMonth: 1, joinedYear: 2026, status: 'ACTIVE', role: 'ADMIN', notes: 'Committee President / Organizer' }
 ];
 
-const INITIAL_EXPENSES: ExpenseRecord[] = [
-  {
-    id: 'exp_1',
-    title: 'Committee Register & Account Books',
-    category: 'ADMINISTRATIVE',
-    amount: 650,
-    date: '2026-01-15',
-    description: 'Physical ledger diary, stamp, and receipt pads for record keeping.',
-    recordedBy: 'Admin',
-    receiptNote: 'Stationery Bill #12'
-  },
-  {
-    id: 'exp_2',
-    title: 'First Member General Meeting Refreshment',
-    category: 'EVENT',
-    amount: 1200,
-    date: '2026-02-05',
-    description: 'Tea and snacks for all 10 members during the kick-off meeting.',
-    recordedBy: 'Admin',
-    receiptNote: 'Catering Memo'
-  }
-];
+const INITIAL_EXPENSES: ExpenseRecord[] = [];
 
 function getInitialPayments(): PaymentRecord[] {
-  const payments: PaymentRecord[] = [];
-  INITIAL_MEMBERS.forEach((m, idx) => {
-    payments.push({
-      id: `pay_jan_${m.id}`,
-      memberId: m.id,
-      memberName: m.name,
-      month: 1,
-      year: 2026,
-      amount: 1000,
-      utrNumber: `6015${idx}892147${idx}`,
-      method: idx % 2 === 0 ? 'UPI_QR' : 'CASH',
-      status: 'VERIFIED',
-      paidAt: `2026-01-0${(idx % 8) + 1}T10:00:00.000Z`,
-      verifiedAt: `2026-01-0${(idx % 8) + 1}T12:00:00.000Z`,
-      verifiedBy: 'Admin'
-    });
-  });
-  return payments;
+  return [];
 }
 
 // Fallback Local File Database
@@ -220,7 +173,19 @@ export async function updateMember(id: string, updates: Partial<Member>): Promis
 }
 
 export async function deleteMember(id: string): Promise<void> {
-  await updateMember(id, { status: 'INACTIVE' });
+  if (isSupabaseConfigured && supabase) {
+    try {
+      await supabase.from('payments').delete().eq('member_id', id);
+      await supabase.from('members').delete().eq('id', id);
+    } catch (e) {
+      console.error('Supabase delete member failed:', e);
+    }
+  }
+
+  const db = getDatabase();
+  db.members = db.members.filter(m => m.id !== id);
+  db.payments = db.payments.filter(p => p.memberId !== id);
+  saveDatabase(db);
 }
 
 // ================= PAYMENT OPERATIONS =================
@@ -747,4 +712,55 @@ export function getMonthName(month: number): string {
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
   return months[month - 1] || `Month ${month}`;
+}
+
+export async function resetToFreshStart(providedPin: string): Promise<void> {
+  const settings = await getSettings();
+  if (providedPin !== settings.adminPin) {
+    throw new Error('Unauthorized: Invalid Admin PIN');
+  }
+
+  const adminName = settings.adminName || 'Narinder Singh';
+  const adminPhone = settings.adminPhone || '9876543210';
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      await supabase.from('payments').delete().neq('id', 'keep_none');
+      await supabase.from('expenses').delete().neq('id', 'keep_none');
+      await supabase.from('members').delete().neq('id', 'mem_1');
+      await supabase.from('members').upsert({
+        id: 'mem_1',
+        name: adminName,
+        phone: adminPhone,
+        joined_month: 1,
+        joined_year: 2026,
+        status: 'ACTIVE',
+        role: 'ADMIN',
+        notes: 'Committee President / Organizer'
+      });
+      await supabase.from('committee_settings').update({
+        admin_name: adminName,
+        payee_name: adminName
+      }).eq('id', 'default');
+    } catch (e) {
+      console.error('Supabase reset error:', e);
+    }
+  }
+
+  const db = getDatabase();
+  db.members = [
+    {
+      id: 'mem_1',
+      name: adminName,
+      phone: adminPhone,
+      joinedMonth: 1,
+      joinedYear: 2026,
+      status: 'ACTIVE',
+      role: 'ADMIN',
+      notes: 'Committee President / Organizer'
+    }
+  ];
+  db.payments = [];
+  db.expenses = [];
+  saveDatabase(db);
 }
