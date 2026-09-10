@@ -1,6 +1,6 @@
 -- ==============================================================================
--- SAMITI: COMMITTEE FUND & PAYMENT TRACKER SUPABASE SCHEMA
--- Copy and paste this whole script into your Supabase Dashboard -> SQL Editor
+-- SAMITI: COMMITTEE FUND & PAYMENT TRACKER SUPABASE SCHEMA (CLEAN SLATE)
+-- Run this SQL in Supabase Dashboard -> SQL Editor -> Run
 -- ==============================================================================
 
 -- 1. Create Settings Table
@@ -10,10 +10,10 @@ CREATE TABLE IF NOT EXISTS committee_settings (
   tagline TEXT DEFAULT 'Building Community Trust & Shared Prosperity',
   monthly_amount NUMERIC NOT NULL DEFAULT 1000,
   upi_id TEXT NOT NULL DEFAULT 'samiti@upi',
-  payee_name TEXT NOT NULL DEFAULT 'Vikas Samiti Treasury',
+  payee_name TEXT NOT NULL DEFAULT 'Narinder Singh',
   admin_pin TEXT NOT NULL DEFAULT '1234',
   currency TEXT DEFAULT 'INR',
-  admin_name TEXT DEFAULT 'Rajesh Sharma',
+  admin_name TEXT DEFAULT 'Narinder Singh',
   admin_phone TEXT DEFAULT '9876543210',
   start_month INT DEFAULT 1,
   start_year INT DEFAULT 2026,
@@ -23,13 +23,15 @@ CREATE TABLE IF NOT EXISTS committee_settings (
 );
 
 -- Migration support for existing tables:
-ALTER TABLE committee_settings ADD COLUMN IF NOT EXISTS admin_name TEXT DEFAULT 'Rajesh Sharma';
+ALTER TABLE committee_settings ADD COLUMN IF NOT EXISTS admin_name TEXT DEFAULT 'Narinder Singh';
 ALTER TABLE committee_settings ADD COLUMN IF NOT EXISTS admin_phone TEXT DEFAULT '9876543210';
 
--- Insert Default Settings if empty
+-- Upsert Default Settings for Narinder Singh
 INSERT INTO committee_settings (id, committee_name, tagline, monthly_amount, upi_id, payee_name, admin_name, admin_phone, admin_pin)
-VALUES ('default', 'Vikas Sahayog Samiti', 'Building Community Trust & Shared Prosperity', 1000, 'samiti@upi', 'Vikas Samiti Treasury', 'Rajesh Sharma', '9876543210', '1234')
-ON CONFLICT (id) DO NOTHING;
+VALUES ('default', 'Vikas Sahayog Samiti', 'Building Community Trust & Shared Prosperity', 1000, 'samiti@upi', 'Narinder Singh', 'Narinder Singh', '9876543210', '1234')
+ON CONFLICT (id) DO UPDATE SET 
+  admin_name = 'Narinder Singh',
+  payee_name = 'Narinder Singh';
 
 -- 2. Create Members Table
 CREATE TABLE IF NOT EXISTS members (
@@ -63,7 +65,6 @@ CREATE TABLE IF NOT EXISTS payments (
   notes TEXT
 );
 
--- Create index for faster UTR uniqueness lookups
 CREATE INDEX IF NOT EXISTS idx_payments_utr ON payments (utr_number);
 CREATE INDEX IF NOT EXISTS idx_payments_member_month ON payments (member_id, month, year);
 
@@ -81,37 +82,26 @@ CREATE TABLE IF NOT EXISTS expenses (
 );
 
 -- ==============================================================================
--- INITIAL SEED DATA (10 Active Members, Payments, and Sample Expenses)
+-- 5. DISABLE ROW LEVEL SECURITY (RLS) & GRANT PERMISSIONS
+-- Prevents Supabase error 42501 when web app adds/edits/deletes members
 -- ==============================================================================
+ALTER TABLE committee_settings DISABLE ROW LEVEL SECURITY;
+ALTER TABLE members DISABLE ROW LEVEL SECURITY;
+ALTER TABLE payments DISABLE ROW LEVEL SECURITY;
+ALTER TABLE expenses DISABLE ROW LEVEL SECURITY;
 
-INSERT INTO members (id, name, phone, joined_month, joined_year, status, role, notes) VALUES
-  ('mem_1', 'Rajesh Sharma', '9876543210', 1, 2026, 'ACTIVE', 'ADMIN', 'Committee President / Organizer'),
-  ('mem_2', 'Sunil Verma', '9876543211', 1, 2026, 'ACTIVE', 'MEMBER', NULL),
-  ('mem_3', 'Ramesh Gupta', '9876543212', 1, 2026, 'ACTIVE', 'MEMBER', NULL),
-  ('mem_4', 'Anil Kumar', '9876543213', 1, 2026, 'ACTIVE', 'MEMBER', NULL),
-  ('mem_5', 'Manoj Tiwari', '9876543214', 1, 2026, 'ACTIVE', 'MEMBER', NULL),
-  ('mem_6', 'Suresh Patel', '9876543215', 1, 2026, 'ACTIVE', 'MEMBER', NULL),
-  ('mem_7', 'Deepak Singh', '9876543216', 1, 2026, 'ACTIVE', 'MEMBER', NULL),
-  ('mem_8', 'Sanjay Joshi', '9876543217', 1, 2026, 'ACTIVE', 'MEMBER', NULL),
-  ('mem_9', 'Vikram Chauhan', '9876543218', 1, 2026, 'ACTIVE', 'MEMBER', NULL),
-  ('mem_10', 'Rakesh Agarwal', '9876543219', 1, 2026, 'ACTIVE', 'MEMBER', NULL)
-ON CONFLICT (id) DO NOTHING;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
 
-INSERT INTO expenses (id, title, category, amount, date, description, recorded_by, receipt_note) VALUES
-  ('exp_1', 'Committee Register & Account Books', 'ADMINISTRATIVE', 650, '2026-01-15', 'Physical ledger diary, stamp, and receipt pads for record keeping.', 'Admin', 'Stationery Bill #12'),
-  ('exp_2', 'First Member General Meeting Refreshment', 'EVENT', 1200, '2026-02-05', 'Tea and snacks for all 10 members during the kick-off meeting.', 'Admin', 'Catering Memo')
-ON CONFLICT (id) DO NOTHING;
+-- ==============================================================================
+-- 6. CLEAN SLATE: WIPE ALL DUMMY DATA & KEEP ONLY ADMIN (NARINDER SINGH)
+-- ==============================================================================
+DELETE FROM payments;
+DELETE FROM expenses;
+DELETE FROM members WHERE id != 'mem_1';
 
--- Seed initial January 2026 contributions
-INSERT INTO payments (id, member_id, member_name, month, year, amount, utr_number, method, status, paid_at, verified_at, verified_by) VALUES
-  ('pay_jan_mem_1', 'mem_1', 'Rajesh Sharma', 1, 2026, 1000, '601508921470', 'UPI_QR', 'VERIFIED', '2026-01-02 10:00:00+00', '2026-01-02 12:00:00+00', 'Admin'),
-  ('pay_jan_mem_2', 'mem_2', 'Sunil Verma', 1, 2026, 1000, '601518921471', 'CASH', 'VERIFIED', '2026-01-03 10:00:00+00', '2026-01-03 12:00:00+00', 'Admin'),
-  ('pay_jan_mem_3', 'mem_3', 'Ramesh Gupta', 1, 2026, 1000, '601528921472', 'UPI_QR', 'VERIFIED', '2026-01-04 10:00:00+00', '2026-01-04 12:00:00+00', 'Admin'),
-  ('pay_jan_mem_4', 'mem_4', 'Anil Kumar', 1, 2026, 1000, '601538921473', 'CASH', 'VERIFIED', '2026-01-05 10:00:00+00', '2026-01-05 12:00:00+00', 'Admin'),
-  ('pay_jan_mem_5', 'mem_5', 'Manoj Tiwari', 1, 2026, 1000, '601548921474', 'UPI_QR', 'VERIFIED', '2026-01-06 10:00:00+00', '2026-01-06 12:00:00+00', 'Admin'),
-  ('pay_jan_mem_6', 'mem_6', 'Suresh Patel', 1, 2026, 1000, '601558921475', 'CASH', 'VERIFIED', '2026-01-07 10:00:00+00', '2026-01-07 12:00:00+00', 'Admin'),
-  ('pay_jan_mem_7', 'mem_7', 'Deepak Singh', 1, 2026, 1000, '601568921476', 'UPI_QR', 'VERIFIED', '2026-01-08 10:00:00+00', '2026-01-08 12:00:00+00', 'Admin'),
-  ('pay_jan_mem_8', 'mem_8', 'Sanjay Joshi', 1, 2026, 1000, '601578921477', 'CASH', 'VERIFIED', '2026-01-09 10:00:00+00', '2026-01-09 12:00:00+00', 'Admin'),
-  ('pay_jan_mem_9', 'mem_9', 'Vikram Chauhan', 1, 2026, 1000, '601588921478', 'UPI_QR', 'VERIFIED', '2026-01-10 10:00:00+00', '2026-01-10 12:00:00+00', 'Admin'),
-  ('pay_jan_mem_10', 'mem_10', 'Rakesh Agarwal', 1, 2026, 1000, '601598921479', 'CASH', 'VERIFIED', '2026-01-11 10:00:00+00', '2026-01-11 12:00:00+00', 'Admin')
-ON CONFLICT (id) DO NOTHING;
+INSERT INTO members (id, name, phone, joined_month, joined_year, status, role, notes) 
+VALUES ('mem_1', 'Narinder Singh', '9876543210', 1, 2026, 'ACTIVE', 'ADMIN', 'Committee President / Organizer')
+ON CONFLICT (id) DO UPDATE SET 
+  name = 'Narinder Singh', 
+  role = 'ADMIN';

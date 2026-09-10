@@ -178,7 +178,7 @@ export const AdminProfileModal: React.FC<AdminProfileModalProps> = ({
               </label>
               <input
                 type="text"
-                placeholder="e.g. Rajesh Sharma"
+                placeholder="e.g. Narinder Singh"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required

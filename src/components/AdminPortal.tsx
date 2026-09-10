@@ -1095,7 +1095,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Rajesh Sharma"
+                    placeholder="e.g. Narinder Singh"
                     value={settingsAdminName}
                     onChange={(e) => setSettingsAdminName(e.target.value)}
                     className="w-full p-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold text-slate-900"
