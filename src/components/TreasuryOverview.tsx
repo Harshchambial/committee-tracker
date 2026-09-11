@@ -26,6 +26,8 @@ interface TreasuryOverviewProps {
   onMatrixClick: () => void;
   onExpensesClick: () => void;
   onJanSahayogClick?: () => void;
+  isAdminLoggedIn?: boolean;
+  onOpenAddPaidMember?: () => void;
 }
 
 export const TreasuryOverview: React.FC<TreasuryOverviewProps> = ({
@@ -34,7 +36,9 @@ export const TreasuryOverview: React.FC<TreasuryOverviewProps> = ({
   onPayClick,
   onMatrixClick,
   onExpensesClick,
-  onJanSahayogClick
+  onJanSahayogClick,
+  isAdminLoggedIn,
+  onOpenAddPaidMember
 }) => {
   const { t, isHindi } = useLanguage();
 
@@ -88,6 +92,35 @@ export const TreasuryOverview: React.FC<TreasuryOverviewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Admin Fast-Action Banner: Quick Entry for Received Payments */}
+      {isAdminLoggedIn && onOpenAddPaidMember && (
+        <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-100/70 border border-emerald-300/80 rounded-2xl p-4 sm:p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-black text-emerald-950 flex items-center gap-1.5">
+                <span>{isHindi ? 'पैसे मिल चुके हैं? तुरंत यहाँ दर्ज करें:' : 'Already received payments in cash/UPI?'}</span>
+              </h4>
+              <p className="text-xs text-emerald-800 font-medium mt-0.5">
+                {isHindi 
+                  ? 'नाम, 10 अंकों का फोन नंबर व राशि भरकर एक क्लिक में रसीद बनाएं।' 
+                  : 'Mandatory name, 10-digit phone & amount. Instantly logs verified payment and generates receipt.'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onOpenAddPaidMember}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs sm:text-sm font-black shadow-md transition cursor-pointer shrink-0 active:scale-95"
+          >
+            <span>➕ {isHindi ? 'प्राप्त भुगतान जोड़ें (Quick Add)' : 'Add Paid Member (+ Receipt)'}</span>
+          </button>
+        </div>
+      )}
 
       {/* 4-Stat High-Trust Financial Breakdown */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">

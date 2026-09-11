@@ -21,9 +21,11 @@ import {
   Edit3,
   ReceiptIndianRupee,
   Clock,
-  HeartHandshake
+  HeartHandshake,
+  Sparkles
 } from 'lucide-react';
 import { EditMemberModal } from '@/components/EditMemberModal';
+import { AddPaidMemberModal } from '@/components/AddPaidMemberModal';
 import { useLanguage } from '@/context/LanguageContext';
 import { 
   Member, 
@@ -47,6 +49,7 @@ interface AdminPortalProps {
   summary: TreasurySummary | null;
   onRefreshData: () => void;
   onAdminProfileUpdated?: (updatedUser: import('@/types').AuthUser, newPin?: string) => void;
+  onViewReceipt?: (payment: PaymentRecord) => void;
 }
 
 const MONTHS = [
@@ -65,7 +68,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   settings,
   summary,
   onRefreshData,
-  onAdminProfileUpdated
+  onAdminProfileUpdated,
+  onViewReceipt
 }) => {
   const { isHindi, t, getMonthName } = useLanguage();
 
@@ -80,6 +84,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   // Forms state
   const [actionLoading, setActionLoading] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Quick Paid Member Modal
+  const [isAddPaidModalOpen, setIsAddPaidModalOpen] = useState(false);
 
   // Offline Payment form state
   const [offlineType, setOfflineType] = useState<ContributionType>('CORE_MONTHLY');
@@ -98,6 +105,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [newMemberType, setNewMemberType] = useState<'CORE' | 'VOLUNTARY'>('CORE');
   const [newMemberNotes, setNewMemberNotes] = useState('');
   const [newMemberHasPaid, setNewMemberHasPaid] = useState(false);
+  const [newMemberPaidAmount, setNewMemberPaidAmount] = useState<number>(settings?.monthlyAmount || 1000);
   const [newMemberPaidMonth, setNewMemberPaidMonth] = useState(new Date().getMonth() + 1);
   const [newMemberPaidYear, setNewMemberPaidYear] = useState(new Date().getFullYear());
   const [newMemberPaidMethod, setNewMemberPaidMethod] = useState<'CASH' | 'UPI_QR'>('CASH');
@@ -246,13 +254,28 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setActionLoading(true);
     setFeedbackMessage(null);
 
+    const cleanName = newMemberName.trim();
+    const cleanPhone = newMemberPhone.trim().replace(/\D/g, '').slice(-10);
+
+    if (!cleanName) {
+      setFeedbackMessage({ type: 'error', text: isHindi ? 'कृपया सदस्य का पूरा नाम दर्ज करें।' : 'Member full name is required.' });
+      setActionLoading(false);
+      return;
+    }
+
+    if (cleanPhone.length < 10) {
+      setFeedbackMessage({ type: 'error', text: isHindi ? 'कृपया 10 अंकों का मान्य मोबाइल नंबर दर्ज करें।' : 'Valid 10-digit mobile number is required.' });
+      setActionLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch('/api/members', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: newMemberName,
-          phone: newMemberPhone,
+          name: cleanName,
+          phone: cleanPhone,
           role: newMemberRole,
           memberType: newMemberType,
           notes: newMemberNotes,
@@ -261,7 +284,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           paidMonth: newMemberPaidMonth,
           paidYear: newMemberPaidYear,
           paidMethod: newMemberPaidMethod,
-          paidAmount: newMemberType === 'CORE' ? (settings?.monthlyAmount || 1000) : 1000
+          paidAmount: Number(newMemberPaidAmount) || (newMemberType === 'CORE' ? (settings?.monthlyAmount || 1000) : 1000),
+          paidContributionType: newMemberType === 'CORE' ? 'CORE_MONTHLY' : 'PUBLIC_SEVA',
+          paidPurpose: newMemberType === 'VOLUNTARY' ? (isHindi ? 'जन सहयोग (ऐच्छिक योगदान)' : 'Jan Sahayog Public Contribution') : undefined,
+          paidNotes: newMemberPaidMethod === 'CASH' 
+            ? (isHindi ? `${settings?.adminName || 'पिताजी'} को नकद प्राप्त हुआ` : `Cash received in hand by ${settings?.adminName || 'Admin'}`) 
+            : undefined
         })
       });
       const data = await res.json();
@@ -273,7 +301,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
       setFeedbackMessage({ 
         type: 'success', 
-        text: data.message || (isHindi ? `सदस्य "${newMemberName}" सफलतापूर्वक जोड़ दिया गया!` : `Member "${newMemberName}" added successfully!`)
+        text: data.message || (isHindi ? `सदस्य "${cleanName}" सफलतापूर्वक जोड़ दिया गया!` : `Member "${cleanName}" added successfully!`)
       });
       setNewMemberName('');
       setNewMemberPhone('');
@@ -1024,36 +1052,57 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Add Member Form */}
           <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs h-fit">
-            <h3 className="font-extrabold text-slate-900 text-base mb-1 flex items-center gap-2">
-              <UserPlus className="w-4 h-4 text-emerald-600" />
-              Add New Member
-            </h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Scale committee from 10 to 100+ members easily.
-            </p>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                  <UserPlus className="w-4 h-4 text-emerald-600" />
+                  <span>{isHindi ? 'नया सदस्य जोड़ें' : 'Add New Member'}</span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {isHindi ? 'समिति के सदस्यों का पंजीकरण' : 'Scale committee from 10 to 100+ members.'}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsAddPaidModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-xs transition cursor-pointer shrink-0"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>{isHindi ? '⚡ प्राप्त भुगतान (Quick Entry)' : '⚡ Quick Add Paid'}</span>
+              </button>
+            </div>
 
             <form onSubmit={handleAddMember} className="space-y-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Full Name *</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">{isHindi ? 'पूरा नाम *' : 'Full Name *'}</label>
                 <input
                   type="text"
-                  placeholder="e.g. Narendra Verma"
+                  placeholder={isHindi ? 'जैसे: राजेश शर्मा / कुलदीप सिंह' : 'e.g. Narendra Verma'}
                   value={newMemberName}
                   onChange={(e) => setNewMemberName(e.target.value)}
                   required
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm"
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-bold"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Phone Number (10 Digits) *</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center justify-between">
+                  <span>{isHindi ? 'मोबाइल नंबर (10 अंक) *' : 'Phone Number (10 Digits) *'}</span>
+                  <span className="text-[10px] font-mono text-slate-400">
+                    {newMemberPhone.replace(/\D/g, '').length}/10
+                  </span>
+                </label>
                 <input
                   type="tel"
                   placeholder="e.g. 9812345678"
                   value={newMemberPhone}
-                  onChange={(e) => setNewMemberPhone(e.target.value)}
+                  onChange={(e) => setNewMemberPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  maxLength={10}
                   required
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm"
+                  className={`w-full p-2.5 rounded-xl border font-mono font-bold text-xs sm:text-sm ${
+                    newMemberPhone.replace(/\D/g, '').length === 10 ? 'border-emerald-400 bg-emerald-50/20' : 'border-slate-300'
+                  }`}
                 />
               </div>
 
@@ -1065,7 +1114,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => setNewMemberType('CORE')}
+                    onClick={() => {
+                      setNewMemberType('CORE');
+                      if (newMemberHasPaid) setNewMemberPaidAmount(settings?.monthlyAmount || 1000);
+                    }}
                     className={`p-2 rounded-xl border text-left transition cursor-pointer flex flex-col ${
                       newMemberType === 'CORE'
                         ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500/30 text-emerald-950 font-bold'
@@ -1078,7 +1130,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => setNewMemberType('VOLUNTARY')}
+                    onClick={() => {
+                      setNewMemberType('VOLUNTARY');
+                      if (newMemberHasPaid && newMemberPaidAmount === 1000) setNewMemberPaidAmount(500);
+                    }}
                     className={`p-2 rounded-xl border text-left transition cursor-pointer flex flex-col ${
                       newMemberType === 'VOLUNTARY'
                         ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500/30 text-indigo-950 font-bold'
@@ -1098,7 +1153,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 <select
                   value={newMemberRole}
                   onChange={(e) => setNewMemberRole(e.target.value as any)}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm bg-white"
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm bg-white font-medium"
                 >
                   <option value="MEMBER">{isHindi ? 'सदस्य' : 'Member'}</option>
                   <option value="ADMIN">{isHindi ? 'सह-व्यवस्थापक (Co-Admin)' : 'Co-Admin / Organizer'}</option>
@@ -1133,7 +1188,40 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 </label>
 
                 {newMemberHasPaid && (
-                  <div className="space-y-2 pt-2 border-t border-emerald-200/70 animate-in fade-in duration-150">
+                  <div className="space-y-2.5 pt-2 border-t border-emerald-200/70 animate-in fade-in duration-150">
+                    {/* Amount Paid Field */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[10px] font-bold text-emerald-900 uppercase">
+                          {isHindi ? 'भुगतान की गई राशि (₹) *' : 'Amount Paid (₹) *'}
+                        </label>
+                        <div className="flex items-center gap-1">
+                          {[500, 1000, 2000].map(amt => (
+                            <button
+                              key={amt}
+                              type="button"
+                              onClick={() => setNewMemberPaidAmount(amt)}
+                              className={`text-[9px] px-1.5 py-0.5 rounded font-bold transition cursor-pointer ${
+                                newMemberPaidAmount === amt
+                                  ? 'bg-emerald-700 text-white'
+                                  : 'bg-white text-emerald-800 border border-emerald-300'
+                              }`}
+                            >
+                              ₹{amt}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <input
+                        type="number"
+                        min={1}
+                        value={newMemberPaidAmount || ''}
+                        onChange={(e) => setNewMemberPaidAmount(Number(e.target.value))}
+                        className="w-full p-2 bg-white rounded-lg border border-emerald-300 font-mono font-bold text-xs text-slate-900"
+                        placeholder="1000"
+                      />
+                    </div>
+
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block text-[10px] font-bold text-emerald-800 uppercase mb-0.5">
@@ -1159,14 +1247,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                           onChange={(e) => setNewMemberPaidMethod(e.target.value as any)}
                           className="w-full p-2 bg-white rounded-lg border border-emerald-300 text-xs font-bold"
                         >
-                          <option value="CASH">{isHindi ? 'नकद' : 'Cash in Hand'}</option>
-                          <option value="UPI_QR">{isHindi ? 'UPI / ऑनलाइन' : 'UPI / Online'}</option>
+                          <option value="CASH">{isHindi ? '💵 नकद (Cash to Father)' : '💵 Cash'}</option>
+                          <option value="UPI_QR">{isHindi ? '📱 UPI / ऑनलाइन' : '📱 UPI / Online'}</option>
                         </select>
                       </div>
                     </div>
 
                     <div className="flex items-center justify-between text-[11px] text-emerald-700 font-semibold px-1">
-                      <span>{isHindi ? 'राशि:' : 'Amount:'} ₹{newMemberType === 'CORE' ? (settings?.monthlyAmount || 1000) : 1000}</span>
+                      <span>{isHindi ? 'दर्ज होने वाली राशि:' : 'Amount to Record:'} ₹{(newMemberPaidAmount || 1000).toLocaleString('en-IN')}</span>
                       <span className="text-emerald-800 font-bold">{isHindi ? 'स्वतः सत्यापित ✓' : 'Auto-Verified ✓'}</span>
                     </div>
                   </div>
@@ -1181,7 +1269,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 {actionLoading 
                   ? (isHindi ? 'जोड़ा जा रहा है...' : 'Adding...') 
                   : (newMemberHasPaid 
-                      ? (isHindi ? 'सदस्य जोड़ें एवं भुगतान दर्ज करें' : 'Add Member & Record Payment') 
+                      ? (isHindi ? `सदस्य जोड़ें एवं ₹${newMemberPaidAmount || 1000} दर्ज करें` : `Add Member & Record ₹${newMemberPaidAmount || 1000}`) 
                       : (isHindi ? 'सदस्य जोड़ें' : 'Add Member'))}
               </button>
             </form>
@@ -1470,6 +1558,16 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         member={selectedMemberToEdit}
         adminPin={adminPin}
         onMemberUpdated={onRefreshData}
+      />
+
+      {/* Quick Add Paid Member Modal */}
+      <AddPaidMemberModal
+        isOpen={isAddPaidModalOpen}
+        onClose={() => setIsAddPaidModalOpen(false)}
+        adminPin={adminPin}
+        settings={settings}
+        onMemberAdded={onRefreshData}
+        onViewReceipt={onViewReceipt}
       />
     </div>
   );

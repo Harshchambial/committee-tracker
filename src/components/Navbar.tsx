@@ -71,18 +71,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="flex items-center justify-between h-14 sm:h-20">
             {/* Brand & Committee Info */}
             <div 
-              className="flex items-center gap-2.5 sm:gap-3 cursor-pointer min-w-0" 
+              className="flex items-center gap-2 sm:gap-3 cursor-pointer min-w-0" 
               onClick={() => setActiveTab('overview')}
             >
-              <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-amber-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/20 shrink-0">
-                <Building2 className="w-5 h-5 sm:w-6 sm:h-6" />
+              <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-amber-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/20 shrink-0">
+                <Building2 className="w-4 h-4 sm:w-6 sm:h-6" />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <h1 className="text-sm sm:text-xl font-black text-slate-900 tracking-tight leading-none truncate max-w-[125px] sm:max-w-xs">
+                  <h1 className="text-xs sm:text-xl font-black text-slate-900 tracking-tight leading-none truncate max-w-[130px] xs:max-w-[160px] sm:max-w-xs">
                     {settings?.committeeName || (isHindi ? 'विकास सहयोग समिति' : 'Vikas Samiti')}
                   </h1>
-                  <span className="inline-flex items-center px-1.5 py-0.2 rounded-md text-[10px] sm:text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+                  <span className="hidden sm:inline-flex items-center px-1.5 py-0.2 rounded-md text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
                     ₹{settings?.monthlyAmount || 1000}/mo
                   </span>
                 </div>
@@ -92,27 +92,27 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             </div>
 
-            {/* Right Side: Language Toggle + Balance + User Profile */}
-            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+            {/* Right Side: Clean Language Toggle + User Profile */}
+            <div className="flex items-center gap-1 sm:gap-2.5 shrink-0">
               {/* Language Switcher Toggle */}
               <button
                 type="button"
                 onClick={toggleLanguage}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200/80 text-amber-900 text-xs font-black transition cursor-pointer active:scale-95 shadow-2xs"
+                className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200/80 text-amber-900 text-[11px] sm:text-xs font-black transition cursor-pointer active:scale-95 shadow-2xs"
                 title={isHindi ? 'Switch to English' : 'हिन्दी में बदलें'}
               >
-                <Languages className="w-3.5 h-3.5 text-orange-600" />
-                <span className="font-bold">{language === 'hi' ? 'English' : 'हिन्दी'}</span>
+                <Languages className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+                <span className="font-bold">{language === 'hi' ? 'EN' : 'हिन्दी'}</span>
               </button>
 
-              {/* Net Treasury Balance */}
-              <div className="flex items-center bg-slate-100/90 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-slate-200">
+              {/* Net Treasury Balance - Desktop Only */}
+              <div className="hidden md:flex items-center bg-slate-100/90 px-3 py-1.5 rounded-xl border border-slate-200">
                 <div className="flex flex-col text-right">
-                  <span className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-500 leading-none">
+                  <span className="text-[10px] uppercase font-bold text-slate-500 leading-none">
                     {isHindi ? 'कोष' : 'Balance'}
                   </span>
-                  <span className="text-xs sm:text-base font-black text-emerald-600 flex items-center justify-end leading-tight mt-0.5">
-                    <IndianRupee className="w-3 h-3 sm:w-3.5 sm:h-3.5 inline mr-0.5 stroke-[2.5]" />
+                  <span className="text-base font-black text-emerald-600 flex items-center justify-end leading-tight mt-0.5">
+                    <IndianRupee className="w-3.5 h-3.5 inline mr-0.5 stroke-[2.5]" />
                     {(summary?.netBalance ?? 0).toLocaleString('en-IN')}
                   </span>
                 </div>
@@ -123,13 +123,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   type="button"
                   onClick={isAdmin ? onOpenAdminProfile : undefined}
-                  className={`flex items-center gap-1.5 sm:gap-2 bg-slate-50 border border-slate-200/80 px-2 sm:px-2.5 py-1 rounded-xl transition text-left ${
+                  className={`flex items-center gap-1.5 sm:gap-2 bg-slate-50 border border-slate-200/80 px-1.5 sm:px-2.5 py-1 rounded-xl transition text-left ${
                     isAdmin ? 'hover:bg-amber-50 hover:border-amber-300 cursor-pointer' : 'cursor-default'
                   }`}
-                  title={isAdmin ? "Edit Admin Name & Password" : currentUser.name}
+                  title={isAdmin ? (isHindi ? "व्यवस्थापक प्रोफाइल संपादित करें" : "Edit Admin Name & Password") : currentUser.name}
                 >
-                  <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center text-xs font-black text-white ${
-                    isAdmin ? 'bg-amber-600' : 'bg-emerald-600'
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-white ${
+                    isAdmin ? 'bg-amber-600 shadow-xs shadow-amber-600/30' : 'bg-emerald-600'
                   }`}>
                     {currentUser.name.charAt(0)}
                   </div>

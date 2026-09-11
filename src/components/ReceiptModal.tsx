@@ -27,6 +27,15 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
 }) => {
   const { t, isHindi, getMonthName } = useLanguage();
 
+  // Escape key listener
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   if (!payment) return null;
 
   const isPublic = payment.contributionType === 'PUBLIC_SEVA';
@@ -56,18 +65,36 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto print:p-0 print:bg-white">
-      <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-7 shadow-2xl border border-slate-200 relative my-6 print:border-none print:shadow-none print:p-2 print:my-0">
-        {/* Close Button (Hidden in Print) */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition cursor-pointer print:hidden"
-        >
-          <X className="w-4 h-4" />
-        </button>
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 backdrop-blur-xs overflow-y-auto print:p-0 print:bg-white"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="bg-white rounded-3xl max-w-md w-full max-h-[94vh] flex flex-col shadow-2xl border border-slate-200 relative my-auto print:border-none print:shadow-none print:p-2 print:my-0 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        {/* Sticky Header with Prominent Close Button */}
+        <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md px-4 sm:px-6 py-3 border-b border-slate-100 flex items-center justify-between shrink-0 print:hidden shadow-2xs">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              {isHindi ? 'डिजिटल रसीद' : 'Official Receipt'}
+            </span>
+            <span className="font-mono text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200">
+              {receiptNumber}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 flex items-center justify-center transition cursor-pointer border border-slate-200 active:scale-95 shadow-2xs"
+            aria-label={isHindi ? 'रसीद बंद करें' : 'Close Receipt'}
+            title={isHindi ? 'बंद करें (Esc)' : 'Close (Esc)'}
+          >
+            <X className="w-4 h-4 stroke-[2.5]" />
+          </button>
+        </div>
 
-        {/* Receipt Content */}
-        <div id="printable-receipt" className="space-y-5">
+        {/* Scrollable Receipt Body */}
+        <div className="overflow-y-auto p-4 sm:p-6 space-y-5">
           {/* Header */}
           <div className="text-center border-b border-slate-200 pb-4">
             <div className={`w-12 h-12 rounded-2xl ${isPublic ? 'bg-orange-600' : 'bg-emerald-600'} text-white flex items-center justify-center mx-auto mb-2.5 shadow-md`}>
@@ -173,22 +200,34 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           </div>
         </div>
 
-        {/* Action Buttons (Print & WhatsApp Share) */}
-        <div className="grid grid-cols-2 gap-2 mt-5 pt-3 border-t border-slate-100 print:hidden">
-          <button
-            onClick={handlePrint}
-            className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold transition cursor-pointer"
-          >
-            <Printer className="w-4 h-4 text-slate-600" />
-            <span>{t('printReceipt')}</span>
-          </button>
+        {/* Action Buttons (Print, WhatsApp Share & Done) */}
+        <div className="p-4 bg-slate-50 border-t border-slate-200 shrink-0 print:hidden space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold transition cursor-pointer shadow-2xs"
+            >
+              <Printer className="w-4 h-4 text-slate-600" />
+              <span>{t('printReceipt')}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleShareWhatsApp}
+              className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition cursor-pointer"
+            >
+              <Share2 className="w-4 h-4" />
+              <span>{t('shareWhatsApp')}</span>
+            </button>
+          </div>
 
           <button
-            onClick={handleShareWhatsApp}
-            className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition cursor-pointer"
+            type="button"
+            onClick={onClose}
+            className="w-full py-2.5 px-3 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold transition cursor-pointer text-center"
           >
-            <Share2 className="w-4 h-4" />
-            <span>{t('shareWhatsApp')}</span>
+            {isHindi ? 'रसीद बंद करें (Done)' : 'Close Receipt'}
           </button>
         </div>
       </div>

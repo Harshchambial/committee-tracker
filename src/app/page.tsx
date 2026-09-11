@@ -13,6 +13,7 @@ import { ReceiptModal } from '@/components/ReceiptModal';
 import { LoginScreen } from '@/components/LoginScreen';
 import { ChangePasswordModal } from '@/components/ChangePasswordModal';
 import { AdminProfileModal } from '@/components/AdminProfileModal';
+import { AddPaidMemberModal } from '@/components/AddPaidMemberModal';
 import { useLanguage } from '@/context/LanguageContext';
 import { 
   TreasurySummary, 
@@ -20,8 +21,8 @@ import {
   Member, 
   PaymentRecord, 
   ExpenseRecord, 
-  MemberMatrixRow,
-  AuthUser,
+  MemberMatrixRow, 
+  AuthUser, 
   ContributionType 
 } from '@/types';
 import { ShieldCheck, RefreshCw } from 'lucide-react';
@@ -54,6 +55,7 @@ export default function Home() {
   const [receiptPayment, setReceiptPayment] = useState<PaymentRecord | null>(null);
   const [isChangePassOpen, setIsChangePassOpen] = useState<boolean>(false);
   const [isAdminProfileOpen, setIsAdminProfileOpen] = useState<boolean>(false);
+  const [isAddPaidMemberOpen, setIsAddPaidMemberOpen] = useState<boolean>(false);
 
   // Load saved user session on mount
   useEffect(() => {
@@ -248,6 +250,8 @@ export default function Home() {
                 onMatrixClick={() => setActiveTab('matrix')}
                 onExpensesClick={() => setActiveTab('expenses')}
                 onJanSahayogClick={() => setActiveTab('jan-sahayog')}
+                isAdminLoggedIn={isAdmin}
+                onOpenAddPaidMember={() => setIsAddPaidMemberOpen(true)}
               />
             )}
 
@@ -308,6 +312,7 @@ export default function Home() {
                 summary={summary}
                 onRefreshData={fetchData}
                 onAdminProfileUpdated={handleAdminProfileUpdated}
+                onViewReceipt={(payment) => setReceiptPayment(payment)}
               />
             )}
           </>
@@ -380,6 +385,16 @@ export default function Home() {
           setAdminPin(newPass);
           localStorage.setItem('samiti_admin_pin', newPass);
         }}
+      />
+
+      {/* Quick Add Paid Member Modal (For rapid entry of members who paid father) */}
+      <AddPaidMemberModal
+        isOpen={isAddPaidMemberOpen}
+        onClose={() => setIsAddPaidMemberOpen(false)}
+        adminPin={adminPin}
+        settings={settings}
+        onMemberAdded={fetchData}
+        onViewReceipt={(payment) => setReceiptPayment(payment)}
       />
     </div>
   );

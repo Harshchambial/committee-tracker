@@ -19,14 +19,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized: Incorrect Admin PIN' }, { status: 401 });
     }
 
-    if (!name || !phone) {
-      return NextResponse.json({ error: 'Member name and phone are required' }, { status: 400 });
+    const cleanName = name.trim();
+    const cleanPhone = phone.trim().replace(/\D/g, '').slice(-10);
+
+    if (!cleanName) {
+      return NextResponse.json({ error: 'Member full name is required (सदस्य का नाम अनिवार्य है)' }, { status: 400 });
+    }
+
+    if (cleanPhone.length < 10) {
+      return NextResponse.json({ error: 'Valid 10-digit mobile number is mandatory (10 अंकों का मोबाइल नंबर अनिवार्य है)' }, { status: 400 });
     }
 
     const now = new Date();
     const newMember = await addMember({
-      name: name.trim(),
-      phone: phone.trim(),
+      name: cleanName,
+      phone: cleanPhone,
       email: email?.trim(),
       joinedMonth: joinedMonth || (now.getMonth() + 1),
       joinedYear: joinedYear || now.getFullYear(),
@@ -42,15 +49,21 @@ export async function POST(request: Request) {
       const pMonth = body.paidMonth ? parseInt(body.paidMonth, 10) : (now.getMonth() + 1);
       const pYear = body.paidYear ? parseInt(body.paidYear, 10) : now.getFullYear();
       const pMethod = body.paidMethod || 'CASH';
-      const pAmount = body.paidAmount ? parseFloat(body.paidAmount) : settings.monthlyAmount;
+      const pAmount = body.paidAmount ? parseFloat(body.paidAmount) : (body.memberType === 'CORE' ? settings.monthlyAmount : 1000);
+      const pContributionType = body.paidContributionType || (body.memberType === 'VOLUNTARY' ? 'PUBLIC_SEVA' : 'CORE_MONTHLY');
+      const pPurpose = body.paidPurpose || (pContributionType === 'PUBLIC_SEVA' ? 'जन सहयोग एवं विकास कार्य' : undefined);
 
       initialPayment = await logOfflinePayment({
         memberId: newMember.id,
+        contributorName: newMember.name,
+        contributorPhone: newMember.phone,
         month: pMonth,
         year: pYear,
         amount: pAmount,
         method: pMethod,
-        notes: body.paidNotes || 'Initial contribution recorded at registration',
+        contributionType: pContributionType,
+        purpose: pPurpose,
+        notes: body.paidNotes || (pMethod === 'CASH' ? 'Cash payment received in hand' : 'Payment received via UPI/Direct'),
         verifiedBy: settings.adminName || 'Admin'
       });
     }

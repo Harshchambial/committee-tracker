@@ -62,6 +62,16 @@ export const AdminProfileModal: React.FC<AdminProfileModalProps> = ({
     }
   }, [isOpen, currentUser, settingsPhone, adminPin]);
 
+  // Escape key listener
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -106,41 +116,47 @@ export const AdminProfileModal: React.FC<AdminProfileModalProps> = ({
       });
 
       const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to update profile');
-      }
+      if (!res.ok) throw new Error(data.error || 'Failed to update admin profile');
 
       confetti({ particleCount: 50, spread: 60 });
       setSuccessMessage('Admin profile updated successfully!');
-
+      
       const updatedUser: AuthUser = {
         name: cleanName,
-        phone: phone.trim(),
+        phone: phone.trim() || currentUser?.phone || '9876543210',
         role: 'ADMIN'
       };
 
-      onProfileUpdated(updatedUser, data.newPin);
+      onProfileUpdated(updatedUser, showPasswordChange ? newPin.trim() : undefined);
 
       setTimeout(() => {
         onClose();
         setSuccessMessage(null);
-      }, 1800);
+      }, 1500);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Something went wrong');
+      setErrorMessage(err.message);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-7 shadow-2xl border border-slate-200 relative animate-in fade-in zoom-in-95 duration-150 my-auto">
         {/* Close Button */}
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition cursor-pointer"
+          className="absolute top-4 right-4 w-9 h-9 rounded-full bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 flex items-center justify-center transition cursor-pointer border border-slate-200 active:scale-95 shadow-2xs"
+          aria-label="Close"
+          title="Close (Esc)"
         >
-          <X className="w-4 h-4" />
+          <X className="w-5 h-5 stroke-[2.5]" />
         </button>
 
         <div className="text-center pb-4 border-b border-slate-100">

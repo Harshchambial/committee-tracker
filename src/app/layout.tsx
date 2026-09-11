@@ -5,6 +5,13 @@ import { LanguageProvider } from "@/context/LanguageContext";
 export const metadata: Metadata = {
   title: "Samiti - Committee Fund & Payment Tracker",
   description: "Transparent monthly ₹1,000 contribution tracker, UPI payment verification, and fund utilization ledger.",
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/icon.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/favicon.svg',
+  }
 };
 
 export default function RootLayout({
