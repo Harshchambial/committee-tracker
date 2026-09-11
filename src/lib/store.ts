@@ -101,7 +101,7 @@ export async function getAllMembers(): Promise<Member[]> {
   if (isSupabaseConfigured && supabase) {
     try {
       const { data, error } = await supabase.from('members').select('*').order('name', { ascending: true });
-      if (!error && data && data.length > 0) {
+      if (!error && Array.isArray(data) && data.length > 0) {
         return data.map(m => ({
           id: m.id,
           name: m.name,
@@ -136,25 +136,40 @@ export async function addMember(memberData: Omit<Member, 'id'>): Promise<Member>
 
   if (isSupabaseConfigured && supabase) {
     try {
-      await supabase.from('members').insert({
+      const insertData: any = {
         id: newMember.id,
         name: newMember.name,
         phone: newMember.phone,
-        email: newMember.email,
-        joined_month: newMember.joinedMonth,
-        joined_year: newMember.joinedYear,
-        status: newMember.status,
-        role: newMember.role,
-        member_type: newMember.memberType,
-        notes: newMember.notes
-      });
+        email: newMember.email || null,
+        joined_month: newMember.joinedMonth || 1,
+        joined_year: newMember.joinedYear || 2026,
+        status: newMember.status || 'ACTIVE',
+        role: newMember.role || 'MEMBER',
+        member_type: newMember.memberType || 'CORE',
+        notes: newMember.notes || null
+      };
+
+      const { error } = await supabase.from('members').insert(insertData);
+      if (error) {
+        console.warn('Supabase add member failed with member_type, retrying without it:', error.message);
+        delete insertData.member_type;
+        const retryRes = await supabase.from('members').insert(insertData);
+        if (retryRes.error) {
+          console.error('Supabase add member retry error:', retryRes.error.message);
+        }
+      }
     } catch (e) {
       console.error('Supabase add member failed:', e);
     }
   }
 
   const db = getDatabase();
-  db.members.push(newMember);
+  const existingIdx = db.members.findIndex(m => m.id === newMember.id);
+  if (existingIdx >= 0) {
+    db.members[existingIdx] = newMember;
+  } else {
+    db.members.push(newMember);
+  }
   saveDatabase(db);
   return newMember;
 }
@@ -169,7 +184,11 @@ export async function updateMember(id: string, updates: Partial<Member>): Promis
       if (updates.role !== undefined) updatePayload.role = updates.role;
       if (updates.memberType !== undefined) updatePayload.member_type = updates.memberType;
       if (updates.notes !== undefined) updatePayload.notes = updates.notes;
-      await supabase.from('members').update(updatePayload).eq('id', id);
+      const { error } = await supabase.from('members').update(updatePayload).eq('id', id);
+      if (error && error.message?.includes('member_type')) {
+        delete updatePayload.member_type;
+        await supabase.from('members').update(updatePayload).eq('id', id);
+      }
     } catch (e) {
       console.error('Supabase update member failed:', e);
     }
@@ -177,10 +196,25 @@ export async function updateMember(id: string, updates: Partial<Member>): Promis
 
   const db = getDatabase();
   const index = db.members.findIndex(m => m.id === id);
-  if (index === -1) throw new Error('Member not found');
-  db.members[index] = { ...db.members[index], ...updates };
+  if (index >= 0) {
+    db.members[index] = { ...db.members[index], ...updates };
+    saveDatabase(db);
+    return db.members[index];
+  }
+  const fallbackMember: Member = {
+    id,
+    name: updates.name || 'Member',
+    phone: updates.phone || '',
+    joinedMonth: updates.joinedMonth || 1,
+    joinedYear: updates.joinedYear || 2026,
+    status: updates.status || 'ACTIVE',
+    role: updates.role || 'MEMBER',
+    memberType: updates.memberType || 'CORE',
+    notes: updates.notes
+  };
+  db.members.push(fallbackMember);
   saveDatabase(db);
-  return db.members[index];
+  return fallbackMember;
 }
 
 export async function deleteMember(id: string): Promise<void> {
@@ -325,9 +359,9 @@ export async function submitPayment(data: {
 
   if (isSupabaseConfigured && supabase) {
     try {
-      await supabase.from('payments').insert({
+      const paymentInsert: any = {
         id: paymentRecord.id,
-        member_id: paymentRecord.memberId,
+        member_id: member ? member.id : (memberId && !memberId.startsWith('guest_') ? memberId : null),
         member_name: paymentRecord.memberName,
         month: paymentRecord.month,
         year: paymentRecord.year,
@@ -336,11 +370,28 @@ export async function submitPayment(data: {
         method: paymentRecord.method,
         status: paymentRecord.status,
         contribution_type: paymentRecord.contributionType,
-        purpose: paymentRecord.purpose,
-        contributor_phone: paymentRecord.contributorPhone,
+        purpose: paymentRecord.purpose || null,
+        contributor_phone: paymentRecord.contributorPhone || null,
         paid_at: paymentRecord.paidAt,
-        notes: paymentRecord.notes
-      });
+        notes: paymentRecord.notes || null
+      };
+
+      const { error } = await supabase.from('payments').insert(paymentInsert);
+      if (error) {
+        console.warn('Supabase submit payment error, retrying without extended columns:', error.message);
+        delete paymentInsert.contribution_type;
+        delete paymentInsert.purpose;
+        delete paymentInsert.contributor_phone;
+        if (error.message?.includes('foreign key') || error.message?.includes('violates foreign key')) {
+          paymentInsert.member_id = null;
+        }
+        const retryRes = await supabase.from('payments').insert(paymentInsert);
+        if (retryRes.error) {
+          console.warn('Supabase submit payment retry failed, retrying with member_id=null:', retryRes.error.message);
+          paymentInsert.member_id = null;
+          await supabase.from('payments').insert(paymentInsert);
+        }
+      }
     } catch (e) {
       console.error('Supabase submit payment error:', e);
     }
@@ -370,39 +421,54 @@ export async function logOfflinePayment(data: {
   let member = data.memberId ? members.find(m => m.id === data.memberId) : undefined;
 
   let memberName = '';
-  let memberId = '';
+  let memberId: string | undefined = data.memberId;
   const currentDate = new Date();
   const month = data.month || (currentDate.getMonth() + 1);
   const year = data.year || currentDate.getFullYear();
 
   if (isPublicSeva) {
     memberName = (data.contributorName || member?.name || 'Public Contributor').trim();
-    memberId = data.memberId || `guest_${Date.now()}`;
+    memberId = member ? member.id : undefined;
   } else {
-    if (!data.memberId) throw new Error('Please select a member.');
-    member = members.find(m => m.id === data.memberId);
-    if (!member) throw new Error('Member not found');
-    memberName = member.name;
-    memberId = member.id;
+    if (member) {
+      memberName = member.name;
+      memberId = member.id;
+    } else if (data.contributorName) {
+      memberName = data.contributorName.trim();
+      memberId = data.memberId;
+    } else if (data.memberId) {
+      const localDb = getDatabase();
+      const localMember = localDb.members.find(m => m.id === data.memberId);
+      if (localMember) {
+        memberName = localMember.name;
+        memberId = localMember.id;
+      } else {
+        throw new Error('Member not found. Please select a valid member.');
+      }
+    } else {
+      throw new Error('Please select a member.');
+    }
 
     const payments = await getAllPayments();
-    const existing = payments.find(p => 
-      p.memberId === memberId && 
-      p.month === month && 
-      p.year === year && 
-      (p.contributionType || 'CORE_MONTHLY') === 'CORE_MONTHLY' &&
-      p.status === 'VERIFIED'
-    );
+    if (memberId) {
+      const existing = payments.find(p => 
+        p.memberId === memberId && 
+        p.month === month && 
+        p.year === year && 
+        (p.contributionType || 'CORE_MONTHLY') === 'CORE_MONTHLY' &&
+        p.status === 'VERIFIED'
+      );
 
-    if (existing) {
-      throw new Error(`Payment for ${getMonthName(month)} ${year} is already verified.`);
+      if (existing) {
+        throw new Error(`Payment for ${getMonthName(month)} ${year} is already verified.`);
+      }
     }
   }
 
   const settings = await getSettings();
   const paymentRecord: PaymentRecord = {
     id: `pay_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-    memberId,
+    memberId: memberId || `guest_${Date.now()}`,
     memberName,
     month,
     year,
@@ -421,26 +487,43 @@ export async function logOfflinePayment(data: {
 
   if (isSupabaseConfigured && supabase) {
     try {
-      await supabase.from('payments').insert({
+      const paymentInsert: any = {
         id: paymentRecord.id,
-        member_id: paymentRecord.memberId,
+        member_id: member ? member.id : (memberId && !memberId.startsWith('guest_') ? memberId : null),
         member_name: paymentRecord.memberName,
         month: paymentRecord.month,
         year: paymentRecord.year,
         amount: paymentRecord.amount,
-        utr_number: paymentRecord.utrNumber,
+        utr_number: paymentRecord.utrNumber || null,
         method: paymentRecord.method,
         status: paymentRecord.status,
         contribution_type: paymentRecord.contributionType,
-        purpose: paymentRecord.purpose,
-        contributor_phone: paymentRecord.contributorPhone,
+        purpose: paymentRecord.purpose || null,
+        contributor_phone: paymentRecord.contributorPhone || null,
         paid_at: paymentRecord.paidAt,
         verified_at: paymentRecord.verifiedAt,
         verified_by: paymentRecord.verifiedBy,
-        notes: paymentRecord.notes
-      });
+        notes: paymentRecord.notes || null
+      };
+
+      const { error } = await supabase.from('payments').insert(paymentInsert);
+      if (error) {
+        console.warn('Supabase log offline payment error, retrying without extended columns:', error.message);
+        delete paymentInsert.contribution_type;
+        delete paymentInsert.purpose;
+        delete paymentInsert.contributor_phone;
+        if (error.message?.includes('foreign key') || error.message?.includes('violates foreign key')) {
+          paymentInsert.member_id = null;
+        }
+        const retryRes = await supabase.from('payments').insert(paymentInsert);
+        if (retryRes.error) {
+          console.warn('Supabase payment insert retry failed, retrying with member_id=null:', retryRes.error.message);
+          paymentInsert.member_id = null;
+          await supabase.from('payments').insert(paymentInsert);
+        }
+      }
     } catch (e) {
-      console.error('Supabase log offline payment error:', e);
+      console.error('Supabase log offline payment exception:', e);
     }
   }
 

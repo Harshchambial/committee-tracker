@@ -20,6 +20,7 @@ interface MyContributionsProps {
   members: Member[];
   payments: PaymentRecord[];
   settings: CommitteeSettings | null;
+  currentUser?: import('@/types').AuthUser | null;
   onPayDues: (memberId: string, month: number, year: number) => void;
   onViewReceipt: (payment: PaymentRecord) => void;
 }
@@ -28,12 +29,23 @@ export const MyContributions: React.FC<MyContributionsProps> = ({
   members,
   payments,
   settings,
+  currentUser,
   onPayDues,
   onViewReceipt
 }) => {
   const { t, isHindi, getMonthName } = useLanguage();
-  const [selectedMemberId, setSelectedMemberId] = useState<string>(members[0]?.id || '');
+  const initialId: string = (currentUser?.id && members.some(m => m.id === currentUser.id)) 
+    ? currentUser.id 
+    : (members[0]?.id || '');
+  const [selectedMemberId, setSelectedMemberId] = useState<string>(initialId);
   const [searchPhone, setSearchPhone] = useState<string>('');
+
+  React.useEffect(() => {
+    if (currentUser) {
+      const match = members.find(m => (currentUser.id && m.id === currentUser.id) || (m.phone && currentUser.phone && m.phone === currentUser.phone));
+      if (match) setSelectedMemberId(match.id);
+    }
+  }, [currentUser, members]);
 
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();

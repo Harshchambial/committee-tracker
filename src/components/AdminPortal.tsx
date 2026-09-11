@@ -22,7 +22,8 @@ import {
   ReceiptIndianRupee,
   Clock,
   HeartHandshake,
-  Sparkles
+  Sparkles,
+  UserCheck
 } from 'lucide-react';
 import { EditMemberModal } from '@/components/EditMemberModal';
 import { AddPaidMemberModal } from '@/components/AddPaidMemberModal';
@@ -50,6 +51,7 @@ interface AdminPortalProps {
   onRefreshData: () => void;
   onAdminProfileUpdated?: (updatedUser: import('@/types').AuthUser, newPin?: string) => void;
   onViewReceipt?: (payment: PaymentRecord) => void;
+  onOpenMyReceipts?: () => void;
 }
 
 const MONTHS = [
@@ -69,7 +71,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   summary,
   onRefreshData,
   onAdminProfileUpdated,
-  onViewReceipt
+  onViewReceipt,
+  onOpenMyReceipts
 }) => {
   const { isHindi, t, getMonthName } = useLanguage();
 
@@ -1523,6 +1526,32 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 Keep this file saved on your father&apos;s phone or Google Drive for 100% peace of mind.
               </p>
             </div>
+          </div>
+
+          {/* Personal Passbook & Receipts Card */}
+          <div className="lg:col-span-2 bg-gradient-to-r from-emerald-50/90 via-teal-50/70 to-slate-50 rounded-2xl p-5 sm:p-6 border border-emerald-200/90 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-1.5 max-w-xl">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[11px] font-bold">
+                <UserCheck className="w-3.5 h-3.5 text-emerald-700" />
+                <span>{isHindi ? 'व्यक्तिगत पासबुक व रसीदें' : 'Personal Passbook & Receipts'}</span>
+              </div>
+              <h4 className="font-extrabold text-slate-900 text-sm sm:text-base">
+                {isHindi ? 'अपनी या किसी भी सदस्य की रसीदें एवं पासबुक देखें' : 'View Personal Receipts & Official Digital Passbook'}
+              </h4>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                {isHindi 
+                  ? 'सभी भुगतानों के डिजिटल वाउचर, मासिक पर्चियां और मुद्रण योग्य रसीदें देखने के लिए पासबुक खोलें। रसीदों को सीधे WhatsApp पर भी शेयर कर सकते हैं।' 
+                  : 'Access verified payment vouchers, monthly slips, and printable receipts. Easily share vouchers to WhatsApp or download for physical records.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onOpenMyReceipts}
+              className="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition cursor-pointer shrink-0 active:scale-95"
+            >
+              <UserCheck className="w-4 h-4" />
+              <span>{isHindi ? 'पासबुक व रसीदें खोलें →' : 'Open Passbook & Receipts →'}</span>
+            </button>
           </div>
 
           {/* Danger Zone: Wipe Test Data */}

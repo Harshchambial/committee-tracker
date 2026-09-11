@@ -43,9 +43,13 @@ CREATE TABLE IF NOT EXISTS members (
   joined_year INT DEFAULT 2026,
   status TEXT NOT NULL DEFAULT 'ACTIVE',
   role TEXT NOT NULL DEFAULT 'MEMBER',
+  member_type TEXT DEFAULT 'CORE',
   notes TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Migration for members table:
+ALTER TABLE members ADD COLUMN IF NOT EXISTS member_type TEXT DEFAULT 'CORE';
 
 -- 3. Create Payments Table
 CREATE TABLE IF NOT EXISTS payments (
@@ -58,12 +62,20 @@ CREATE TABLE IF NOT EXISTS payments (
   utr_number TEXT,
   method TEXT NOT NULL DEFAULT 'UPI_QR',
   status TEXT NOT NULL DEFAULT 'PENDING_APPROVAL',
+  contribution_type TEXT DEFAULT 'CORE_MONTHLY',
+  purpose TEXT,
+  contributor_phone TEXT,
   paid_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   verified_at TIMESTAMP WITH TIME ZONE,
   verified_by TEXT,
   rejection_reason TEXT,
   notes TEXT
 );
+
+-- Migration for payments table:
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS contribution_type TEXT DEFAULT 'CORE_MONTHLY';
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS purpose TEXT;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS contributor_phone TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_payments_utr ON payments (utr_number);
 CREATE INDEX IF NOT EXISTS idx_payments_member_month ON payments (member_id, month, year);

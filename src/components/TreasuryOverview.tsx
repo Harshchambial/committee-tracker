@@ -14,7 +14,8 @@ import {
   FileSpreadsheet,
   HeartHandshake,
   Building2,
-  Sparkles
+  Sparkles,
+  UserCheck
 } from 'lucide-react';
 import { TreasurySummary, CommitteeSettings } from '@/types';
 import { useLanguage } from '@/context/LanguageContext';
@@ -28,6 +29,7 @@ interface TreasuryOverviewProps {
   onJanSahayogClick?: () => void;
   isAdminLoggedIn?: boolean;
   onOpenAddPaidMember?: () => void;
+  onOpenMyReceipts?: () => void;
 }
 
 export const TreasuryOverview: React.FC<TreasuryOverviewProps> = ({
@@ -38,7 +40,8 @@ export const TreasuryOverview: React.FC<TreasuryOverviewProps> = ({
   onExpensesClick,
   onJanSahayogClick,
   isAdminLoggedIn,
-  onOpenAddPaidMember
+  onOpenAddPaidMember,
+  onOpenMyReceipts
 }) => {
   const { t, isHindi } = useLanguage();
 
@@ -217,6 +220,36 @@ export const TreasuryOverview: React.FC<TreasuryOverviewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Discrete Quick Access: Personal Passbook & Digital Receipts */}
+      {onOpenMyReceipts && (
+        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:border-slate-300 transition">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+              <UserCheck className="w-5 h-5 text-emerald-600" />
+            </div>
+            <div>
+              <h4 className="text-xs sm:text-sm font-black text-slate-900 flex items-center gap-1.5">
+                <span>{isHindi ? 'अपनी व्यक्तिगत रसीदें व पासबुक देखना चाहते हैं?' : 'Looking for your personal receipts & passbook?'}</span>
+              </h4>
+              <p className="text-[11px] sm:text-xs text-slate-500">
+                {isHindi 
+                  ? 'अपने पिछले भुगतानों की डिजिटल रसीद, मासिक पर्चियां और मुद्रण योग्य पासबुक देखें।' 
+                  : 'Access verified digital slips and full contribution history for your family.'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onOpenMyReceipts}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-emerald-50 hover:text-emerald-800 text-slate-700 font-bold text-xs border border-slate-200 transition cursor-pointer shrink-0 active:scale-95"
+          >
+            <UserCheck className="w-4 h-4 text-emerald-600" />
+            <span>{isHindi ? 'मेरी रसीदें देखें →' : 'View My Receipts →'}</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };

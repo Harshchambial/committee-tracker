@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Building2, 
   IndianRupee, 
@@ -11,10 +11,11 @@ import {
   ReceiptIndianRupee, 
   ShieldCheck, 
   LogOut,
-  KeyRound,
   User as UserIcon,
   HeartHandshake,
   Languages,
+  ChevronDown,
+  Settings as SettingsIcon,
   Sparkles
 } from 'lucide-react';
 import { CommitteeSettings, TreasurySummary, AuthUser } from '@/types';
@@ -39,28 +40,50 @@ export const Navbar: React.FC<NavbarProps> = ({
   settings,
   currentUser,
   onLogout,
-  onOpenChangePassword,
   onOpenAdminProfile,
   pendingApprovals
 }) => {
   const { t, language, toggleLanguage, isHindi } = useLanguage();
   const isAdmin = currentUser?.role === 'ADMIN';
 
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on click outside or Escape
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsUserMenuOpen(false);
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  // Decluttered Desktop Navigation Tabs (Receipts relocated to User Profile & Settings)
   const desktopTabs = [
     { id: 'overview', label: t('tabOverview'), icon: LayoutDashboard },
     { id: 'jan-sahayog', label: t('tabJanSahayog'), icon: HeartHandshake },
     { id: 'matrix', label: t('tabMatrix'), icon: Table2 },
     { id: 'pay', label: t('tabPay'), icon: QrCode, highlight: true },
-    { id: 'my-ledger', label: t('tabLedger'), icon: UserCheck },
     { id: 'expenses', label: t('tabExpenses'), icon: ReceiptIndianRupee },
   ];
 
+  // Decluttered 5-Button Mobile Navigation (Thumb-friendly, no crowding)
   const mobileTabs = [
     { id: 'overview', label: isHindi ? 'कोष' : 'Home', icon: LayoutDashboard },
     { id: 'jan-sahayog', label: isHindi ? 'सहयोग' : 'Sahayog', icon: HeartHandshake },
     { id: 'pay', label: isHindi ? 'सहयोग दें' : 'Donate', icon: QrCode, isHero: true },
     { id: 'matrix', label: isHindi ? 'मासिक' : 'Matrix', icon: Table2 },
-    { id: 'my-ledger', label: isHindi ? 'रसीदें' : 'Receipts', icon: UserCheck },
+    { id: 'expenses', label: isHindi ? 'कार्य' : 'Works', icon: ReceiptIndianRupee },
   ];
 
   return (
@@ -79,7 +102,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <h1 className="text-xs sm:text-xl font-black text-slate-900 tracking-tight leading-none truncate max-w-[130px] xs:max-w-[160px] sm:max-w-xs">
+                  <h1 className="text-xs sm:text-xl font-black text-slate-900 tracking-tight leading-none truncate max-w-[125px] xs:max-w-[160px] sm:max-w-xs">
                     {settings?.committeeName || (isHindi ? 'विकास सहयोग समिति' : 'Vikas Samiti')}
                   </h1>
                   <span className="hidden sm:inline-flex items-center px-1.5 py-0.2 rounded-md text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
@@ -92,7 +115,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             </div>
 
-            {/* Right Side: Clean Language Toggle + User Profile */}
+            {/* Right Side Controls */}
             <div className="flex items-center gap-1 sm:gap-2.5 shrink-0">
               {/* Language Switcher Toggle */}
               <button
@@ -118,64 +141,158 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               </div>
 
-              {/* User Identity Chip */}
-              {currentUser && (
-                <button
-                  type="button"
-                  onClick={isAdmin ? onOpenAdminProfile : undefined}
-                  className={`flex items-center gap-1.5 sm:gap-2 bg-slate-50 border border-slate-200/80 px-1.5 sm:px-2.5 py-1 rounded-xl transition text-left ${
-                    isAdmin ? 'hover:bg-amber-50 hover:border-amber-300 cursor-pointer' : 'cursor-default'
-                  }`}
-                  title={isAdmin ? (isHindi ? "व्यवस्थापक प्रोफाइल संपादित करें" : "Edit Admin Name & Password") : currentUser.name}
-                >
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-white ${
-                    isAdmin ? 'bg-amber-600 shadow-xs shadow-amber-600/30' : 'bg-emerald-600'
-                  }`}>
-                    {currentUser.name.charAt(0)}
-                  </div>
-                  <div className="text-left text-xs hidden sm:block">
-                    <div className="font-bold text-slate-900 leading-tight max-w-[100px] truncate">{currentUser.name}</div>
-                    <div className="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
-                      <span>{isAdmin ? (isHindi ? 'व्यवस्थापक' : 'Admin') : (isHindi ? 'सदस्य' : 'Member')}</span>
-                      {isAdmin && <span className="text-amber-600 font-bold text-[9px]">• Edit</span>}
-                    </div>
-                  </div>
-                </button>
-              )}
-
-              {/* Admin Portal Tab Button for Desktop */}
+              {/* Admin Portal Tab Button (Direct Access) */}
               {isAdmin && (
                 <button
                   type="button"
                   onClick={() => setActiveTab('admin')}
-                  className={`hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-xl font-bold text-xs border transition cursor-pointer ${
+                  className={`inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl font-bold text-xs border transition cursor-pointer ${
                     activeTab === 'admin'
                       ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200'
+                      : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border-amber-200'
                   }`}
+                  title={isHindi ? 'व्यवस्थापक कक्ष' : 'Admin Panel'}
                 >
-                  <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
-                  <span>{t('tabAdmin')}</span>
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+                  <span className="hidden xs:inline">{t('tabAdmin')}</span>
                   {pendingApprovals > 0 && (
-                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                    <span className="px-1.5 py-0.2 rounded-full bg-red-500 text-white text-[10px] font-black animate-pulse">
+                      {pendingApprovals}
+                    </span>
                   )}
                 </button>
               )}
 
-              {/* Logout Button */}
-              <button
-                type="button"
-                onClick={onLogout}
-                className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-700 text-xs font-bold flex items-center gap-1 border border-slate-200 transition cursor-pointer"
-                title={t('logout')}
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{t('logout')}</span>
-              </button>
+              {/* User Identity Chip with Dropdown Menu */}
+              {currentUser && (
+                <div ref={userMenuRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsUserMenuOpen(prev => !prev)}
+                    className={`flex items-center gap-1.5 sm:gap-2 bg-slate-50 hover:bg-slate-100 border px-1.5 sm:px-2.5 py-1 rounded-xl transition text-left cursor-pointer active:scale-95 ${
+                      isUserMenuOpen 
+                        ? 'border-emerald-400 bg-emerald-50/60 ring-2 ring-emerald-500/20' 
+                        : 'border-slate-200/80'
+                    }`}
+                    title={isHindi ? "खाता एवं रसीदें खोलें" : "Account & Receipts"}
+                  >
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-white shrink-0 ${
+                      isAdmin ? 'bg-amber-600 shadow-xs shadow-amber-600/30' : 'bg-emerald-600'
+                    }`}>
+                      {currentUser.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="text-left text-xs hidden sm:block">
+                      <div className="font-bold text-slate-900 leading-tight max-w-[95px] truncate">{currentUser.name}</div>
+                      <div className="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
+                        <span>{isAdmin ? (isHindi ? 'व्यवस्थापक' : 'Admin') : (isHindi ? 'सदस्य' : 'Member')}</span>
+                      </div>
+                    </div>
+                    <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isUserMenuOpen ? 'rotate-180 text-emerald-600' : ''}`} />
+                  </button>
+
+                  {/* Organized User Dropdown (Holds My Receipts & Profile) */}
+                  {isUserMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white rounded-2xl shadow-xl border border-slate-200/90 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                      {/* User Header Profile */}
+                      <div className="px-4 py-3 border-b border-slate-100">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black text-white shrink-0 ${
+                            isAdmin ? 'bg-amber-600 shadow-sm' : 'bg-emerald-600 shadow-sm'
+                          }`}>
+                            {currentUser.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-extrabold text-slate-900 text-sm truncate">{currentUser.name}</h4>
+                            <p className="text-xs text-slate-500 truncate font-mono">
+                              {currentUser.phone ? `+91 ${currentUser.phone}` : 'Committee Member'}
+                            </p>
+                            <span className={`inline-block mt-1 px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                              isAdmin ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                            }`}>
+                              {isAdmin 
+                                ? (isHindi ? '🛡️ मुख्य व्यवस्थापक (Admin)' : '🛡️ Committee Admin') 
+                                : (isHindi ? '⭐ कोर सदस्य (Core Member)' : '⭐ Core Member')}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Dropdown Options */}
+                      <div className="p-1.5 space-y-1">
+                        {/* 1. My Receipts & Passbook (Organized Here) */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveTab('my-ledger');
+                            setIsUserMenuOpen(false);
+                          }}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition cursor-pointer ${
+                            activeTab === 'my-ledger'
+                              ? 'bg-emerald-50 text-emerald-950 border border-emerald-200'
+                              : 'text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                            <UserCheck className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <div className="text-slate-900 font-extrabold flex items-center gap-1.5">
+                              <span>{isHindi ? 'मेरी रसीदें एवं पासबुक' : 'My Receipts & Passbook'}</span>
+                              <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-100 text-emerald-800 font-bold">VIP</span>
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-normal">
+                              {isHindi ? 'भुगतानों की रसीदें, मासिक पर्चियां व विवरण' : 'Verified vouchers, slips & contribution history'}
+                            </div>
+                          </div>
+                        </button>
+
+                        {/* 2. Admin Profile & PIN Edit (if Admin) */}
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onOpenAdminProfile?.();
+                              setIsUserMenuOpen(false);
+                            }}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-900 transition cursor-pointer"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                              <SettingsIcon className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <div className="text-slate-900 font-extrabold">
+                                {isHindi ? 'व्यवस्थापक प्रोफाइल एवं पिन' : 'Admin Profile & PIN'}
+                              </div>
+                              <div className="text-[10px] text-slate-400 font-normal">
+                                {isHindi ? 'नाम, मोबाइल और 4-अंकीय पिन बदलें' : 'Update name, mobile & 4-digit PIN'}
+                              </div>
+                            </div>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Logout Item */}
+                      <div className="pt-1.5 mt-1 border-t border-slate-100 px-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsUserMenuOpen(false);
+                            onLogout();
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-bold text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          <span>{isHindi ? 'लॉगआउट करें (Sign Out)' : 'Sign Out'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Desktop Navigation Tabs Bar */}
+          {/* Desktop Navigation Tabs Bar (Clean, Uncluttered 5 Tabs + Admin) */}
           <nav className="hidden sm:flex items-center space-x-1 py-2 border-t border-slate-100 overflow-x-auto">
             {desktopTabs.map((tab) => {
               const Icon = tab.icon;
@@ -220,7 +337,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </header>
 
-      {/* Mobile Bottom Navigation Bar (Sticky Thumb-Friendly) */}
+      {/* Mobile Bottom Navigation Bar (Clean 5 Thumb-Friendly Tabs) */}
       <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-lg px-2 py-1.5 flex items-center justify-around">
         {mobileTabs.map((tab) => {
           const Icon = tab.icon;
@@ -252,21 +369,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           );
         })}
-
-        {isAdmin && (
-          <button
-            onClick={() => setActiveTab('admin')}
-            className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition cursor-pointer relative ${
-              activeTab === 'admin' ? 'text-amber-700 font-bold' : 'text-slate-400 hover:text-slate-700'
-            }`}
-          >
-            <ShieldCheck className="w-5 h-5 stroke-2" />
-            <span className="text-[10px] mt-0.5 leading-none">{isHindi ? 'व्यवस्थापक' : 'Admin'}</span>
-            {pendingApprovals > 0 && (
-              <span className="absolute top-0.5 right-2 w-2 h-2 rounded-full bg-red-500" />
-            )}
-          </button>
-        )}
       </nav>
     </>
   );

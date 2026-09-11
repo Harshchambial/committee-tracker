@@ -252,6 +252,7 @@ export default function Home() {
                 onJanSahayogClick={() => setActiveTab('jan-sahayog')}
                 isAdminLoggedIn={isAdmin}
                 onOpenAddPaidMember={() => setIsAddPaidMemberOpen(true)}
+                onOpenMyReceipts={() => setActiveTab('my-ledger')}
               />
             )}
 
@@ -284,6 +285,7 @@ export default function Home() {
                 members={members}
                 payments={payments}
                 settings={settings}
+                currentUser={currentUser}
                 onPayDues={(memberId, month, yearVal) => handleOpenPayModal(memberId, month, yearVal)}
                 onViewReceipt={(payment) => setReceiptPayment(payment)}
               />
@@ -313,6 +315,7 @@ export default function Home() {
                 onRefreshData={fetchData}
                 onAdminProfileUpdated={handleAdminProfileUpdated}
                 onViewReceipt={(payment) => setReceiptPayment(payment)}
+                onOpenMyReceipts={() => setActiveTab('my-ledger')}
               />
             )}
           </>
