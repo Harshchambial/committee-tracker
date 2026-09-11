@@ -5,6 +5,7 @@ import { Navbar } from '@/components/Navbar';
 import { TreasuryOverview } from '@/components/TreasuryOverview';
 import { PaymentMatrix } from '@/components/PaymentMatrix';
 import { PayDuesModal } from '@/components/PayDuesModal';
+import { JanSahayogLedger } from '@/components/JanSahayogLedger';
 import { MyContributions } from '@/components/MyContributions';
 import { FundUtilization } from '@/components/FundUtilization';
 import { AdminPortal } from '@/components/AdminPortal';
@@ -12,6 +13,7 @@ import { ReceiptModal } from '@/components/ReceiptModal';
 import { LoginScreen } from '@/components/LoginScreen';
 import { ChangePasswordModal } from '@/components/ChangePasswordModal';
 import { AdminProfileModal } from '@/components/AdminProfileModal';
+import { useLanguage } from '@/context/LanguageContext';
 import { 
   TreasurySummary, 
   CommitteeSettings, 
@@ -19,11 +21,13 @@ import {
   PaymentRecord, 
   ExpenseRecord, 
   MemberMatrixRow,
-  AuthUser 
+  AuthUser,
+  ContributionType 
 } from '@/types';
 import { ShieldCheck, RefreshCw } from 'lucide-react';
 
 export default function Home() {
+  const { isHindi } = useLanguage();
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [year, setYear] = useState<number>(new Date().getFullYear());
 
@@ -46,6 +50,7 @@ export default function Home() {
   const [payModalInitialMemberId, setPayModalInitialMemberId] = useState<string | undefined>();
   const [payModalInitialMonth, setPayModalInitialMonth] = useState<number | undefined>();
   const [payModalInitialYear, setPayModalInitialYear] = useState<number | undefined>();
+  const [payModalInitialType, setPayModalInitialType] = useState<ContributionType>('CORE_MONTHLY');
   const [receiptPayment, setReceiptPayment] = useState<PaymentRecord | null>(null);
   const [isChangePassOpen, setIsChangePassOpen] = useState<boolean>(false);
   const [isAdminProfileOpen, setIsAdminProfileOpen] = useState<boolean>(false);
@@ -154,11 +159,12 @@ export default function Home() {
     fetchData();
   };
 
-  const handleOpenPayModal = (memberId?: string, month?: number, yearVal?: number) => {
+  const handleOpenPayModal = (memberId?: string, month?: number, yearVal?: number, initialType?: ContributionType) => {
     const targetMemberId = memberId || (currentUser?.role === 'MEMBER' ? currentUser.id : undefined);
     setPayModalInitialMemberId(targetMemberId);
     setPayModalInitialMonth(month);
     setPayModalInitialYear(yearVal);
+    setPayModalInitialType(initialType || 'CORE_MONTHLY');
     setIsPayModalOpen(true);
   };
 
@@ -229,7 +235,7 @@ export default function Home() {
           <div className="flex flex-col items-center justify-center py-24 space-y-4">
             <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin" />
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Loading Verified Committee Ledger...
+              {isHindi ? 'प्रमाणित समिति रिकॉर्ड लोड हो रहे हैं...' : 'Loading Verified Committee Ledger...'}
             </p>
           </div>
         ) : (
@@ -241,6 +247,18 @@ export default function Home() {
                 onPayClick={() => handleOpenPayModal()}
                 onMatrixClick={() => setActiveTab('matrix')}
                 onExpensesClick={() => setActiveTab('expenses')}
+                onJanSahayogClick={() => setActiveTab('jan-sahayog')}
+              />
+            )}
+
+            {activeTab === 'jan-sahayog' && (
+              <JanSahayogLedger
+                payments={payments}
+                members={members}
+                settings={settings}
+                summary={summary}
+                onContributeClick={() => handleOpenPayModal(undefined, undefined, undefined, 'PUBLIC_SEVA')}
+                onViewReceipt={(payment) => setReceiptPayment(payment)}
               />
             )}
 
@@ -301,25 +319,25 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>{settings?.committeeName || 'Committee'} • Signed in as <strong>{currentUser.name}</strong> ({isAdmin ? 'Admin' : 'Member'})</span>
+            <span>{settings?.committeeName || 'Committee'} • {isHindi ? 'लॉगिन खाता:' : 'Signed in as'} <strong>{currentUser.name}</strong> ({isAdmin ? (isHindi ? 'व्यवस्थापक' : 'Admin') : (isHindi ? 'सदस्य' : 'Member')})</span>
           </div>
 
           <div className="flex items-center gap-4">
             <span className="font-mono text-[11px] bg-slate-100 px-2 py-1 rounded-md text-slate-600">
-              Contribution: ₹{settings?.monthlyAmount || 1000}/mo
+              {isHindi ? 'कोर अंशदान:' : 'Core Contribution:'} ₹{settings?.monthlyAmount || 1000}{isHindi ? '/माह' : '/mo'}
             </span>
             <button
               onClick={fetchData}
               className="hover:text-emerald-700 flex items-center gap-1 font-semibold transition cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              Refresh
+              {isHindi ? 'रिफ्रेश' : 'Refresh'}
             </button>
             <button
               onClick={handleLogout}
               className="text-rose-600 hover:text-rose-700 font-bold transition cursor-pointer"
             >
-              Sign Out
+              {isHindi ? 'लॉगआउट' : 'Sign Out'}
             </button>
           </div>
         </div>
@@ -334,6 +352,7 @@ export default function Home() {
         initialMemberId={payModalInitialMemberId}
         initialMonth={payModalInitialMonth}
         initialYear={payModalInitialYear}
+        initialType={payModalInitialType}
         onPaymentSuccess={fetchData}
       />
 

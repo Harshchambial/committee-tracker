@@ -10,6 +10,8 @@ export type ExpenseCategory =
   | 'MAINTENANCE'
   | 'OTHER';
 
+export type ContributionType = 'CORE_MONTHLY' | 'PUBLIC_SEVA';
+
 export interface Member {
   id: string;
   name: string;
@@ -19,6 +21,7 @@ export interface Member {
   joinedYear: number;
   status: 'ACTIVE' | 'INACTIVE';
   role: 'MEMBER' | 'ADMIN';
+  memberType?: 'CORE' | 'VOLUNTARY';
   notes?: string;
   pin?: string;
 }
@@ -33,6 +36,9 @@ export interface PaymentRecord {
   utrNumber?: string;
   method: PaymentMethod;
   status: PaymentStatus;
+  contributionType?: ContributionType;
+  purpose?: string;
+  contributorPhone?: string;
   paidAt: string; // ISO string
   verifiedAt?: string;
   verifiedBy?: string;
@@ -57,6 +63,7 @@ export interface CommitteeSettings {
   monthlyAmount: number; // e.g. 1000
   upiId: string; // e.g. father@upi
   payeeName: string; // Account holder name
+  customQrUrl?: string; // Optional custom QR code graphic URL
   adminPin: string; // 4-6 digit PIN or password
   adminName?: string; // Admin / Organizer full name
   adminPhone?: string; // Admin contact phone
@@ -76,10 +83,14 @@ export interface CommitteeDatabase {
 
 export interface TreasurySummary {
   totalCollected: number;
+  coreCollected: number;
+  publicCollected: number;
   totalExpenses: number;
   netBalance: number;
   totalMembers: number;
   activeMembers: number;
+  coreMembersCount: number;
+  publicContributorsCount: number;
   currentMonthCollections: number;
   currentMonthTarget: number;
   currentMonthPendingCount: number;

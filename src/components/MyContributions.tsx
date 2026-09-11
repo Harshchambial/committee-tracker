@@ -14,6 +14,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { Member, PaymentRecord, CommitteeSettings } from '@/types';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface MyContributionsProps {
   members: Member[];
@@ -23,11 +24,6 @@ interface MyContributionsProps {
   onViewReceipt: (payment: PaymentRecord) => void;
 }
 
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
-];
-
 export const MyContributions: React.FC<MyContributionsProps> = ({
   members,
   payments,
@@ -35,6 +31,7 @@ export const MyContributions: React.FC<MyContributionsProps> = ({
   onPayDues,
   onViewReceipt
 }) => {
+  const { t, isHindi, getMonthName } = useLanguage();
   const [selectedMemberId, setSelectedMemberId] = useState<string>(members[0]?.id || '');
   const [searchPhone, setSearchPhone] = useState<string>('');
 
@@ -61,8 +58,8 @@ export const MyContributions: React.FC<MyContributionsProps> = ({
   const pendingApprovals = memberPayments.filter(p => p.status === 'PENDING_APPROVAL');
 
   // Check current year months
-  const monthlyStatusList = MONTHS.map((monthName, idx) => {
-    const monthNum = idx + 1;
+  const monthlyStatusList = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(monthNum => {
+    const monthName = getMonthName(monthNum);
     const payment = memberPayments.find(p => p.month === monthNum && p.year === currentYear);
     return {
       monthNum,
@@ -161,12 +158,12 @@ export const MyContributions: React.FC<MyContributionsProps> = ({
                 {monthlyStatusList[currentMonth - 1]?.payment?.status === 'VERIFIED' ? (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 font-extrabold text-sm border border-emerald-200">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    Up-to-Date for {MONTHS[currentMonth - 1]}
+                    {isHindi ? `${getMonthName(currentMonth)} माह तक जमा` : `Up-to-Date for ${getMonthName(currentMonth)}`}
                   </span>
                 ) : monthlyStatusList[currentMonth - 1]?.payment?.status === 'PENDING_APPROVAL' ? (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 font-extrabold text-sm border border-amber-200">
                     <Clock className="w-4 h-4 text-amber-600" />
-                    Under Verification
+                    {isHindi ? 'सत्यापन प्रतीक्षारत' : 'Under Verification'}
                   </span>
                 ) : (
                   <button
@@ -174,12 +171,12 @@ export const MyContributions: React.FC<MyContributionsProps> = ({
                     className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 cursor-pointer"
                   >
                     <QrCode className="w-4 h-4" />
-                    Pay {MONTHS[currentMonth - 1]} (₹{settings?.monthlyAmount || 1000})
+                    {isHindi ? `${getMonthName(currentMonth)} दें (₹${settings?.monthlyAmount || 1000})` : `Pay ${getMonthName(currentMonth)} (₹${settings?.monthlyAmount || 1000})`}
                   </button>
                 )}
               </div>
               <p className="text-xs text-slate-500 mt-2">
-                Monthly commitment: ₹{settings?.monthlyAmount || 1000}/mo
+                {isHindi ? `मासिक अंशदान: ₹${settings?.monthlyAmount || 1000}/माह` : `Monthly commitment: ₹${settings?.monthlyAmount || 1000}/mo`}
               </p>
             </div>
           </div>

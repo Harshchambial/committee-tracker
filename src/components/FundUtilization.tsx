@@ -14,6 +14,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { ExpenseRecord, ExpenseCategory, TreasurySummary } from '@/types';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface FundUtilizationProps {
   expenses: ExpenseRecord[];
@@ -23,14 +24,14 @@ interface FundUtilizationProps {
   onDeleteExpense?: (id: string) => void;
 }
 
-const CATEGORY_COLORS: Record<ExpenseCategory, { bg: string; text: string; label: string }> = {
-  EVENT: { bg: 'bg-purple-50 border-purple-200', text: 'text-purple-700', label: 'Event & Meeting' },
-  CHARITY: { bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700', label: 'Charity & Donation' },
-  COMMUNITY_WELFARE: { bg: 'bg-blue-50 border-blue-200', text: 'text-blue-700', label: 'Community Welfare' },
-  DISBURSEMENT: { bg: 'bg-amber-50 border-amber-200', text: 'text-amber-800', label: 'Disbursement / Loan' },
-  ADMINISTRATIVE: { bg: 'bg-slate-100 border-slate-200', text: 'text-slate-700', label: 'Admin & Records' },
-  MAINTENANCE: { bg: 'bg-orange-50 border-orange-200', text: 'text-orange-700', label: 'Maintenance' },
-  OTHER: { bg: 'bg-gray-100 border-gray-200', text: 'text-gray-700', label: 'General / Other' },
+const CATEGORY_LABELS: Record<ExpenseCategory, { en: string; hi: string; bg: string; text: string }> = {
+  EVENT: { en: 'Event & Meeting', hi: 'बैठक एवं आयोजन', bg: 'bg-purple-50 border-purple-200', text: 'text-purple-700' },
+  CHARITY: { en: 'Charity & Donation', hi: 'दान एवं सहायता', bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700' },
+  COMMUNITY_WELFARE: { en: 'Community Welfare', hi: 'सार्वजनिक कार्य / विकास', bg: 'bg-blue-50 border-blue-200', text: 'text-blue-700' },
+  DISBURSEMENT: { en: 'Disbursement / Loan', hi: 'आवंटन / ऋण', bg: 'bg-amber-50 border-amber-200', text: 'text-amber-800' },
+  ADMINISTRATIVE: { en: 'Admin & Records', hi: 'प्रशासन एवं पंजी', bg: 'bg-slate-100 border-slate-200', text: 'text-slate-700' },
+  MAINTENANCE: { en: 'Maintenance', hi: 'मरम्मत एवं रखरखाव', bg: 'bg-orange-50 border-orange-200', text: 'text-orange-700' },
+  OTHER: { en: 'General / Other', hi: 'अन्य कार्य', bg: 'bg-gray-100 border-gray-200', text: 'text-gray-700' },
 };
 
 export const FundUtilization: React.FC<FundUtilizationProps> = ({
@@ -40,6 +41,7 @@ export const FundUtilization: React.FC<FundUtilizationProps> = ({
   onAddExpenseClick,
   onDeleteExpense
 }) => {
+  const { t, isHindi } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
 
@@ -66,19 +68,21 @@ export const FundUtilization: React.FC<FundUtilizationProps> = ({
         <div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-800 text-xs font-bold border border-amber-200 mb-2">
             <ReceiptIndianRupee className="w-3.5 h-3.5" />
-            Full Audit & Accountability
+            <span>{isHindi ? 'पूर्ण पारदर्शिता एवं लेखा-जोखा' : 'Full Audit & Accountability'}</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            Fund Utilization & Expense Ledger
+            {t('expensesTitle')}
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Complete transparency into where committee money has been utilized.
+            {t('expensesSubtitle')}
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl text-right">
-            <span className="text-[10px] uppercase font-bold text-slate-500 block">Total Disbursed / Spent</span>
+            <span className="text-[10px] uppercase font-bold text-slate-500 block">
+              {isHindi ? 'कुल खर्च राशि' : 'Total Spent'}
+            </span>
             <div className="text-xl font-black text-amber-600 flex items-center justify-end">
               <IndianRupee className="w-4 h-4 mr-0.5 stroke-[2.5]" />
               {(summary?.totalExpenses ?? 0).toLocaleString('en-IN')}
@@ -91,7 +95,7 @@ export const FundUtilization: React.FC<FundUtilizationProps> = ({
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm shadow-md transition cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              Log New Expense
+              <span>{t('logNewExpense')}</span>
             </button>
           )}
         </div>
@@ -99,8 +103,9 @@ export const FundUtilization: React.FC<FundUtilizationProps> = ({
 
       {/* Category Pills & Breakdown */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-        {Object.entries(CATEGORY_COLORS).map(([catKey, conf]) => {
+        {Object.entries(CATEGORY_LABELS).map(([catKey, conf]) => {
           const total = categoryTotals[catKey] || 0;
+          const label = isHindi ? conf.hi : conf.en;
           return (
             <div 
               key={catKey}
@@ -114,7 +119,7 @@ export const FundUtilization: React.FC<FundUtilizationProps> = ({
               <span className={`text-[10px] uppercase font-extrabold block truncate ${
                 selectedCategory === catKey ? 'text-slate-300' : conf.text
               }`}>
-                {conf.label}
+                {label}
               </span>
               <div className={`text-base font-black mt-1 ${
                 selectedCategory === catKey ? 'text-white' : 'text-slate-900'
@@ -132,7 +137,7 @@ export const FundUtilization: React.FC<FundUtilizationProps> = ({
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search by title, description..."
+            placeholder={isHindi ? 'शीर्षक या विवरण द्वारा खोजें...' : 'Search by title, description...'}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500/20"
@@ -144,7 +149,7 @@ export const FundUtilization: React.FC<FundUtilizationProps> = ({
             onClick={() => setSelectedCategory('ALL')}
             className="text-xs font-semibold text-slate-600 hover:text-slate-900 underline"
           >
-            Clear category filter ({CATEGORY_COLORS[selectedCategory as ExpenseCategory]?.label})
+            {isHindi ? 'फ़िल्टर हटाएं' : 'Clear filter'} ({isHindi ? CATEGORY_LABELS[selectedCategory as ExpenseCategory]?.hi : CATEGORY_LABELS[selectedCategory as ExpenseCategory]?.en})
           </button>
         )}
       </div>
@@ -163,13 +168,13 @@ export const FundUtilization: React.FC<FundUtilizationProps> = ({
             </div>
           ) : (
             filteredExpenses.map(expense => {
-              const catConf = CATEGORY_COLORS[expense.category] || CATEGORY_COLORS.OTHER;
+              const catConf = CATEGORY_LABELS[expense.category] || CATEGORY_LABELS.OTHER;
               return (
                 <div key={expense.id} className="p-5 hover:bg-slate-50/70 transition flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                   <div className="space-y-2 max-w-2xl">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${catConf.bg} ${catConf.text}`}>
-                        {catConf.label}
+                        {isHindi ? catConf.hi : catConf.en}
                       </span>
                       <span className="text-xs text-slate-400 flex items-center gap-1 font-mono">
                         <Calendar className="w-3.5 h-3.5" />

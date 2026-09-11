@@ -20,16 +20,19 @@ import {
   Trash2,
   Edit3,
   ReceiptIndianRupee,
-  Clock
+  Clock,
+  HeartHandshake
 } from 'lucide-react';
 import { EditMemberModal } from '@/components/EditMemberModal';
+import { useLanguage } from '@/context/LanguageContext';
 import { 
   Member, 
   PaymentRecord, 
   ExpenseRecord, 
   CommitteeSettings, 
   TreasurySummary, 
-  ExpenseCategory 
+  ExpenseCategory,
+  ContributionType 
 } from '@/types';
 
 interface AdminPortalProps {
@@ -64,6 +67,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   onRefreshData,
   onAdminProfileUpdated
 }) => {
+  const { isHindi, t, getMonthName } = useLanguage();
+
   // Login PIN state
   const [pinInput, setPinInput] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -77,6 +82,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Offline Payment form state
+  const [offlineType, setOfflineType] = useState<ContributionType>('CORE_MONTHLY');
+  const [offlinePurpose, setOfflinePurpose] = useState('सामान्य विकास एवं जन कल्याण');
   const [offlineMemberId, setOfflineMemberId] = useState(members[0]?.id || '');
   const [offlineMonth, setOfflineMonth] = useState(new Date().getMonth() + 1);
   const [offlineYear, setOfflineYear] = useState(new Date().getFullYear());
@@ -88,6 +95,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberPhone, setNewMemberPhone] = useState('');
   const [newMemberRole, setNewMemberRole] = useState<'MEMBER' | 'ADMIN'>('MEMBER');
+  const [newMemberType, setNewMemberType] = useState<'CORE' | 'VOLUNTARY'>('CORE');
   const [newMemberNotes, setNewMemberNotes] = useState('');
   const [newMemberHasPaid, setNewMemberHasPaid] = useState(false);
   const [newMemberPaidMonth, setNewMemberPaidMonth] = useState(new Date().getMonth() + 1);
@@ -114,6 +122,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [settingsMonthlyAmount, setSettingsMonthlyAmount] = useState(settings?.monthlyAmount || 1000);
   const [settingsAdminName, setSettingsAdminName] = useState(settings?.adminName || '');
   const [settingsAdminPhone, setSettingsAdminPhone] = useState(settings?.adminPhone || '');
+  const [settingsCustomQrUrl, setSettingsCustomQrUrl] = useState(settings?.customQrUrl || '');
   const [newAdminPin, setNewAdminPin] = useState('');
 
   React.useEffect(() => {
@@ -125,6 +134,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       setSettingsMonthlyAmount(settings.monthlyAmount || 1000);
       setSettingsAdminName(settings.adminName || '');
       setSettingsAdminPhone(settings.adminPhone || '');
+      setSettingsCustomQrUrl(settings.customQrUrl || '');
     }
   }, [settings]);
 
@@ -204,18 +214,23 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           memberId: offlineMemberId,
           month: offlineMonth,
           year: offlineYear,
-          amount: offlineAmount,
+          amount: Number(offlineAmount),
           method: offlineMethod,
           notes: offlineNotes,
+          contributionType: offlineType,
+          purpose: offlineType === 'PUBLIC_SEVA' ? offlinePurpose : undefined,
           adminPin,
-          verifiedBy: 'Admin'
+          verifiedBy: settings?.adminName || 'Admin'
         })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
       confetti({ particleCount: 50, spread: 50 });
-      setFeedbackMessage({ type: 'success', text: 'Offline payment verified and recorded!' });
+      setFeedbackMessage({ 
+        type: 'success', 
+        text: isHindi ? 'नकद भुगतान सत्यापित एवं कोष में दर्ज हो गया!' : 'Offline payment verified and recorded!' 
+      });
       setOfflineNotes('');
       onRefreshData();
     } catch (err: any) {
@@ -239,13 +254,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           name: newMemberName,
           phone: newMemberPhone,
           role: newMemberRole,
+          memberType: newMemberType,
           notes: newMemberNotes,
           adminPin,
           hasPaid: newMemberHasPaid,
           paidMonth: newMemberPaidMonth,
           paidYear: newMemberPaidYear,
           paidMethod: newMemberPaidMethod,
-          paidAmount: settings?.monthlyAmount || 1000
+          paidAmount: newMemberType === 'CORE' ? (settings?.monthlyAmount || 1000) : 1000
         })
       });
       const data = await res.json();
@@ -257,7 +273,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
       setFeedbackMessage({ 
         type: 'success', 
-        text: data.message || `Member "${newMemberName}" added successfully!` 
+        text: data.message || (isHindi ? `सदस्य "${newMemberName}" सफलतापूर्वक जोड़ दिया गया!` : `Member "${newMemberName}" added successfully!`)
       });
       setNewMemberName('');
       setNewMemberPhone('');
@@ -273,7 +289,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
   // Delete Member
   const handleDeleteMember = async (memberId: string, memberName: string) => {
-    if (!confirm(`Are you sure you want to permanently delete "${memberName}"? All contributions linked to this member will also be deleted.`)) {
+    const confirmMsg = isHindi 
+      ? `क्या आप वाकई "${memberName}" को हटाना चाहते हैं? इनसे जुड़े सभी रिकॉर्ड भी हट जाएंगे।` 
+      : `Are you sure you want to permanently delete "${memberName}"? All contributions linked to this member will also be deleted.`;
+    if (!confirm(confirmMsg)) {
       return;
     }
     setActionLoading(true);
@@ -286,7 +305,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      setFeedbackMessage({ type: 'success', text: `Member "${memberName}" deleted successfully.` });
+      setFeedbackMessage({ 
+        type: 'success', 
+        text: isHindi ? `सदस्य "${memberName}" सफलतापूर्वक हटा दिया गया।` : `Member "${memberName}" deleted successfully.` 
+      });
       onRefreshData();
     } catch (err: any) {
       setFeedbackMessage({ type: 'error', text: err.message });
@@ -297,7 +319,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
   // Reset / Wipe Dummy Test Data
   const handleResetDummyData = async () => {
-    if (!confirm("⚠️ CAUTION: This will wipe all test payments, dummy members, and demo expenses, leaving only your father as Admin. Are you sure you want to start fresh?")) {
+    const confirmMsg = isHindi
+      ? "⚠️ चेतावनी: इससे सभी नमूना सदस्य, परीक्षण भुगतान और डमी खर्च हट जाएंगे। केवल व्यवस्थापक खाता सुरक्षित रहेगा। क्या आप सुनिश्चित हैं?"
+      : "⚠️ CAUTION: This will wipe all test payments, dummy members, and demo expenses, leaving only your father as Admin. Are you sure you want to start fresh?";
+    if (!confirm(confirmMsg)) {
       return;
     }
     setActionLoading(true);
@@ -345,7 +370,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      setFeedbackMessage({ type: 'success', text: 'Expense recorded successfully!' });
+      setFeedbackMessage({ 
+        type: 'success', 
+        text: isHindi ? 'व्यय सफलतापूर्वक दर्ज किया गया!' : 'Expense recorded successfully!' 
+      });
       setExpenseTitle('');
       setExpenseAmount('');
       setExpenseDesc('');
@@ -372,7 +400,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         payeeName: settingsPayeeName,
         adminName: settingsAdminName.trim(),
         adminPhone: settingsAdminPhone.trim(),
-        monthlyAmount: Number(settingsMonthlyAmount)
+        monthlyAmount: Number(settingsMonthlyAmount),
+        customQrUrl: settingsCustomQrUrl.trim()
       };
       if (newAdminPin && newAdminPin.trim().length >= 4) {
         updates.adminPin = newAdminPin.trim();
@@ -386,7 +415,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      setFeedbackMessage({ type: 'success', text: 'Settings updated successfully!' });
+      setFeedbackMessage({ 
+        type: 'success', 
+        text: isHindi ? 'सेटिंग्स सफलतापूर्वक सहेजी गईं!' : 'Settings updated successfully!' 
+      });
       if (onAdminProfileUpdated) {
         onAdminProfileUpdated({
           name: settingsAdminName.trim() || 'Admin',
@@ -407,7 +439,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     window.location.href = `/api/backup?adminPin=${adminPin}`;
   };
 
-  // Calculate members pending for current month
+  // Calculate members pending for current month (ONLY CORE MEMBERS)
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
   const currentMonthPaidMemberIds = new Set(
@@ -415,7 +447,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       .filter(p => p.month === currentMonth && p.year === currentYear && p.status === 'VERIFIED')
       .map(p => p.memberId)
   );
-  const pendingMembers = members.filter(m => m.status === 'ACTIVE' && !currentMonthPaidMemberIds.has(m.id));
+  const pendingMembers = members.filter(m => m.status === 'ACTIVE' && m.memberType !== 'VOLUNTARY' && !currentMonthPaidMemberIds.has(m.id));
 
   // If Not Logged In, Show PIN Keypad/Form
   if (!isAdminLoggedIn) {
@@ -496,12 +528,31 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       {/* Sub-Navigation Tabs */}
       <div className="flex items-center gap-1 overflow-x-auto no-scrollbar bg-slate-100 p-1.5 rounded-2xl border border-slate-200 text-xs font-bold">
         {[
-          { id: 'APPROVALS', label: `Pending Approvals (${pendingPayments.length})`, count: pendingPayments.length },
-          { id: 'OFFLINE_PAY', label: 'Record Cash Payment' },
-          { id: 'REMINDERS', label: `WhatsApp Reminders (${pendingMembers.length})` },
-          { id: 'EXPENSE', label: 'Add Expense' },
-          { id: 'MEMBERS', label: `Members Directory (${members.length})` },
-          { id: 'SETTINGS', label: 'Settings & Backup' }
+          { 
+            id: 'APPROVALS', 
+            label: isHindi ? `स्वीकृति प्रतीक्षारत (${pendingPayments.length})` : `Pending Approvals (${pendingPayments.length})`, 
+            count: pendingPayments.length 
+          },
+          { 
+            id: 'OFFLINE_PAY', 
+            label: isHindi ? 'नकद भुगतान दर्ज करें' : 'Record Cash Payment' 
+          },
+          { 
+            id: 'REMINDERS', 
+            label: isHindi ? `व्हाट्सएप स्मरण (${pendingMembers.length})` : `WhatsApp Reminders (${pendingMembers.length})` 
+          },
+          { 
+            id: 'EXPENSE', 
+            label: isHindi ? 'खर्च जोड़ें' : 'Add Expense' 
+          },
+          { 
+            id: 'MEMBERS', 
+            label: isHindi ? `सदस्य सूची (${members.length})` : `Members Directory (${members.length})` 
+          },
+          { 
+            id: 'SETTINGS', 
+            label: isHindi ? 'सेटिंग्स एवं बैकअप' : 'Settings & Backup' 
+          }
         ].map(tab => (
           <button
             key={tab.id}
@@ -623,84 +674,163 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       {adminTab === 'OFFLINE_PAY' && (
         <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs max-w-xl">
           <h3 className="font-extrabold text-slate-900 text-base mb-1">
-            Record Cash / Offline Payment
+            {isHindi ? 'नकद / ऑफलाइन भुगतान दर्ज करें' : 'Record Cash / Offline Payment'}
           </h3>
           <p className="text-xs text-slate-500 mb-5">
-            Use this when an elder or member hands cash directly to your father. Instantly verifies and logs.
+            {isHindi 
+              ? 'जब कोई सदस्य या नागरिक सीधे नकद राशि सौंपते हैं, तो उसे यहाँ तुरंत सत्यापित कर कोष में जोड़ें।'
+              : 'Use this when a member or citizen hands cash directly. Instantly verifies and logs.'}
           </p>
+
+          {/* Type Switcher */}
+          <div className="grid grid-cols-2 gap-2 mb-5 p-1 bg-slate-100 rounded-2xl">
+            <button
+              type="button"
+              onClick={() => {
+                setOfflineType('CORE_MONTHLY');
+                setOfflineAmount(settings?.monthlyAmount || 1000);
+              }}
+              className={`py-2.5 px-3 rounded-xl font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                offlineType === 'CORE_MONTHLY'
+                  ? 'bg-white text-emerald-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>⭐</span>
+              <span>{isHindi ? 'कोर मासिक (₹1,000)' : 'Core Monthly (₹1,000)'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setOfflineType('PUBLIC_SEVA');
+                setOfflineAmount(500);
+              }}
+              className={`py-2.5 px-3 rounded-xl font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                offlineType === 'PUBLIC_SEVA'
+                  ? 'bg-white text-indigo-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>🤝</span>
+              <span>{isHindi ? 'जन सहयोग (खुला कोष)' : 'Jan Sahayog (Public)'}</span>
+            </button>
+          </div>
 
           <form onSubmit={handleOfflinePaymentSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Member *</label>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                {isHindi ? 'सदस्य / योगदानकर्ता *' : 'Member / Contributor *'}
+              </label>
               <select
                 value={offlineMemberId}
                 onChange={(e) => setOfflineMemberId(e.target.value)}
                 required
-                className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium"
+                className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-medium bg-white"
               >
                 {members.map(m => (
-                  <option key={m.id} value={m.id}>{m.name} ({m.phone})</option>
+                  <option key={m.id} value={m.id}>
+                    {m.name} ({m.phone}) {m.memberType === 'VOLUNTARY' ? '• Jan Sahayog' : '• Core'}
+                  </option>
                 ))}
               </select>
             </div>
 
+            {offlineType === 'CORE_MONTHLY' ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    {isHindi ? 'माह *' : 'Month *'}
+                  </label>
+                  <select
+                    value={offlineMonth}
+                    onChange={(e) => setOfflineMonth(parseInt(e.target.value, 10))}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm bg-white"
+                  >
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                      <option key={m} value={m}>{getMonthName(m)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    {isHindi ? 'वर्ष *' : 'Year *'}
+                  </label>
+                  <select
+                    value={offlineYear}
+                    onChange={(e) => setOfflineYear(parseInt(e.target.value, 10))}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm bg-white"
+                  >
+                    <option value={2026}>2026</option>
+                    <option value={2027}>2027</option>
+                  </select>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  {isHindi ? 'सहयोग का उद्देश्य / कार्य *' : 'Purpose / Cause *'}
+                </label>
+                <select
+                  value={offlinePurpose}
+                  onChange={(e) => setOfflinePurpose(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm bg-white font-medium mb-1.5"
+                >
+                  <option value="सामान्य विकास एवं जन कल्याण">{isHindi ? 'सामान्य विकास एवं जन कल्याण' : 'General Welfare & Development'}</option>
+                  <option value="मंदिर निर्माण एवं उत्सव">{isHindi ? 'मंदिर निर्माण एवं उत्सव' : 'Temple Construction & Festivals'}</option>
+                  <option value="पार्क एवं वृक्षारोपण">{isHindi ? 'पार्क एवं वृक्षारोपण' : 'Park & Greenery Maintenance'}</option>
+                  <option value="मार्ग प्रकाश (स्ट्रीट लाइट्स)">{isHindi ? 'मार्ग प्रकाश (स्ट्रीट लाइट्स)' : 'Street Lighting & Security'}</option>
+                  <option value="स्वच्छता एवं जल निकास">{isHindi ? 'स्वच्छता एवं जल निकास' : 'Cleanliness & Drainage'}</option>
+                  <option value="विशिष्ट सार्वजनिक कार्य">{isHindi ? 'विशिष्ट सार्वजनिक कार्य' : 'Specific Public Work'}</option>
+                </select>
+                <input
+                  type="text"
+                  placeholder={isHindi ? 'या विशिष्ट उद्देश्य लिखें...' : 'Or enter custom cause...'}
+                  value={offlinePurpose}
+                  onChange={(e) => setOfflinePurpose(e.target.value)}
+                  className="w-full p-2 rounded-xl border border-slate-200 text-xs"
+                />
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Month *</label>
-                <select
-                  value={offlineMonth}
-                  onChange={(e) => setOfflineMonth(parseInt(e.target.value, 10))}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm"
-                >
-                  {MONTHS.map((m, idx) => (
-                    <option key={m} value={idx + 1}>{m}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Year *</label>
-                <select
-                  value={offlineYear}
-                  onChange={(e) => setOfflineYear(parseInt(e.target.value, 10))}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm"
-                >
-                  <option value={2026}>2026</option>
-                  <option value={2027}>2027</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Amount (₹) *</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  {isHindi ? 'राशि (₹) *' : 'Amount (₹) *'}
+                </label>
                 <input
                   type="number"
                   value={offlineAmount}
                   onChange={(e) => setOfflineAmount(Number(e.target.value))}
                   required
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-bold"
+                  min={1}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-black text-slate-900"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Payment Method</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  {isHindi ? 'भुगतान विधि' : 'Payment Method'}
+                </label>
                 <select
                   value={offlineMethod}
                   onChange={(e) => setOfflineMethod(e.target.value as any)}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm"
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm bg-white"
                 >
-                  <option value="CASH">Cash (In Hand)</option>
-                  <option value="BANK_TRANSFER">Direct Bank NEFT/IMPS</option>
+                  <option value="CASH">{isHindi ? 'नकद (हाथ में)' : 'Cash (In Hand)'}</option>
+                  <option value="BANK_TRANSFER">{isHindi ? 'बैंक ट्रांसफर / चेक' : 'Bank Transfer / Cheque'}</option>
                 </select>
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Notes / Remark</label>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                {isHindi ? 'टिप्पणी / विवरण (वैकल्पिक)' : 'Notes / Remarks (Optional)'}
+              </label>
               <input
                 type="text"
-                placeholder="e.g. Received cash during monthly colony meeting"
+                placeholder={isHindi ? 'जैसे: मासिक बैठक में नकद प्राप्त हुआ' : 'e.g. Received cash during monthly colony meeting'}
                 value={offlineNotes}
                 onChange={(e) => setOfflineNotes(e.target.value)}
                 className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm"
@@ -710,9 +840,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             <button
               type="submit"
               disabled={actionLoading}
-              className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition cursor-pointer disabled:opacity-50"
+              className={`w-full py-3 rounded-xl text-white font-black text-xs shadow-md transition cursor-pointer disabled:opacity-50 ${
+                offlineType === 'CORE_MONTHLY'
+                  ? 'bg-slate-900 hover:bg-slate-800'
+                  : 'bg-indigo-900 hover:bg-indigo-800'
+              }`}
             >
-              {actionLoading ? 'Logging...' : 'Verify & Credit Cash Payment (₹1,000)'}
+              {actionLoading 
+                ? (isHindi ? 'सत्यापित हो रहा है...' : 'Logging...') 
+                : (isHindi 
+                    ? `सत्यापित करें एवं ₹${offlineAmount} कोष में जोड़ें` 
+                    : `Verify & Credit Cash (₹${offlineAmount})`)}
             </button>
           </form>
         </div>
@@ -919,23 +1057,61 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 />
               </div>
 
+              {/* Membership Category: Core vs Public */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Role</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  {isHindi ? 'सदस्यता प्रकार (योगदान श्रेणी) *' : 'Membership Category *'}
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewMemberType('CORE')}
+                    className={`p-2 rounded-xl border text-left transition cursor-pointer flex flex-col ${
+                      newMemberType === 'CORE'
+                        ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500/30 text-emerald-950 font-bold'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="text-xs font-black">⭐ {isHindi ? 'कोर सदस्य' : 'Core Member'}</span>
+                    <span className="text-[10px] text-slate-500">{isHindi ? '₹1,000 / माह' : '₹1,000 / mo'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setNewMemberType('VOLUNTARY')}
+                    className={`p-2 rounded-xl border text-left transition cursor-pointer flex flex-col ${
+                      newMemberType === 'VOLUNTARY'
+                        ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500/30 text-indigo-950 font-bold'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="text-xs font-black">🤝 {isHindi ? 'जन सहयोग' : 'Public'}</span>
+                    <span className="text-[10px] text-slate-500">{isHindi ? 'ऐच्छिक दान' : 'Voluntary'}</span>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  {isHindi ? 'भूमिका (Role)' : 'Role'}
+                </label>
                 <select
                   value={newMemberRole}
                   onChange={(e) => setNewMemberRole(e.target.value as any)}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm"
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm bg-white"
                 >
-                  <option value="MEMBER">Member</option>
-                  <option value="ADMIN">Co-Admin / Organizer</option>
+                  <option value="MEMBER">{isHindi ? 'सदस्य' : 'Member'}</option>
+                  <option value="ADMIN">{isHindi ? 'सह-व्यवस्थापक (Co-Admin)' : 'Co-Admin / Organizer'}</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Notes</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  {isHindi ? 'टिप्पणी / पता (वैकल्पिक)' : 'Notes / Address (Optional)'}
+                </label>
                 <input
                   type="text"
-                  placeholder="e.g. Flat 302 / Shop 4"
+                  placeholder={isHindi ? 'जैसे: मकान 302 / दुकान 4' : 'e.g. Flat 302 / Shop 4'}
                   value={newMemberNotes}
                   onChange={(e) => setNewMemberNotes(e.target.value)}
                   className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm"
@@ -952,7 +1128,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
                   />
                   <span className="text-xs font-bold text-emerald-900">
-                    Has this member already paid initial contribution?
+                    {isHindi ? 'क्या सदस्य ने प्रारंभिक अंशदान का भुगतान कर दिया है?' : 'Has this member already paid initial contribution?'}
                   </span>
                 </label>
 
@@ -960,34 +1136,38 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   <div className="space-y-2 pt-2 border-t border-emerald-200/70 animate-in fade-in duration-150">
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="block text-[10px] font-bold text-emerald-800 uppercase mb-0.5">Month</label>
+                        <label className="block text-[10px] font-bold text-emerald-800 uppercase mb-0.5">
+                          {isHindi ? 'माह' : 'Month'}
+                        </label>
                         <select
                           value={newMemberPaidMonth}
                           onChange={(e) => setNewMemberPaidMonth(Number(e.target.value))}
                           className="w-full p-2 bg-white rounded-lg border border-emerald-300 text-xs font-bold"
                         >
-                          {MONTHS.map((m, idx) => (
-                            <option key={idx + 1} value={idx + 1}>{m}</option>
+                          {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                            <option key={m} value={m}>{getMonthName(m)}</option>
                           ))}
                         </select>
                       </div>
 
                       <div>
-                        <label className="block text-[10px] font-bold text-emerald-800 uppercase mb-0.5">Payment Method</label>
+                        <label className="block text-[10px] font-bold text-emerald-800 uppercase mb-0.5">
+                          {isHindi ? 'विधि' : 'Method'}
+                        </label>
                         <select
                           value={newMemberPaidMethod}
                           onChange={(e) => setNewMemberPaidMethod(e.target.value as any)}
                           className="w-full p-2 bg-white rounded-lg border border-emerald-300 text-xs font-bold"
                         >
-                          <option value="CASH">Cash in Hand</option>
-                          <option value="UPI_QR">UPI / Online</option>
+                          <option value="CASH">{isHindi ? 'नकद' : 'Cash in Hand'}</option>
+                          <option value="UPI_QR">{isHindi ? 'UPI / ऑनलाइन' : 'UPI / Online'}</option>
                         </select>
                       </div>
                     </div>
 
                     <div className="flex items-center justify-between text-[11px] text-emerald-700 font-semibold px-1">
-                      <span>Amount: ₹{settings?.monthlyAmount || 1000}</span>
-                      <span className="text-emerald-800">Auto-Verified ✓</span>
+                      <span>{isHindi ? 'राशि:' : 'Amount:'} ₹{newMemberType === 'CORE' ? (settings?.monthlyAmount || 1000) : 1000}</span>
+                      <span className="text-emerald-800 font-bold">{isHindi ? 'स्वतः सत्यापित ✓' : 'Auto-Verified ✓'}</span>
                     </div>
                   </div>
                 )}
@@ -998,7 +1178,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 disabled={actionLoading}
                 className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition cursor-pointer disabled:opacity-50"
               >
-                {actionLoading ? 'Adding...' : (newMemberHasPaid ? 'Add Member & Record Payment' : 'Add Member')}
+                {actionLoading 
+                  ? (isHindi ? 'जोड़ा जा रहा है...' : 'Adding...') 
+                  : (newMemberHasPaid 
+                      ? (isHindi ? 'सदस्य जोड़ें एवं भुगतान दर्ज करें' : 'Add Member & Record Payment') 
+                      : (isHindi ? 'सदस्य जोड़ें' : 'Add Member'))}
               </button>
             </form>
           </div>
@@ -1006,7 +1190,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           {/* Members List */}
           <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
             <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between font-bold text-xs text-slate-700">
-              <span>All Registered Members ({members.length})</span>
+              <span>{isHindi ? `सभी पंजीकृत सदस्य (${members.length})` : `All Registered Members (${members.length})`}</span>
             </div>
 
             <div className="divide-y divide-slate-100 max-h-[500px] overflow-y-auto">
@@ -1024,9 +1208,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                             Admin
                           </span>
                         )}
+                        {member.memberType === 'VOLUNTARY' ? (
+                          <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-indigo-50 text-indigo-700 font-extrabold border border-indigo-200">
+                            {isHindi ? '🤝 जन सहयोग' : '🤝 Public'}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-700 font-extrabold border border-emerald-200">
+                            {isHindi ? '⭐ कोर सदस्य' : '⭐ Core (₹1k)'}
+                          </span>
+                        )}
                         {member.status === 'INACTIVE' && (
                           <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-500 font-extrabold">
-                            Inactive
+                            {isHindi ? 'निष्क्रिय' : 'Inactive'}
                           </span>
                         )}
                       </div>
@@ -1129,7 +1322,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Committee UPI ID (for QR codes) *</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  {isHindi ? 'समिति UPI ID (QR कोड हेतु) *' : 'Committee UPI ID (for QR codes) *'}
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. yourname@okhdfcbank"
@@ -1138,6 +1333,24 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   required
                   className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-mono font-bold"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  {isHindi ? 'कस्टम UPI QR कोड इमेज लिंक (वैकल्पिक)' : 'Custom UPI QR Image URL (Optional)'}
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. https://... or /qr-code.png"
+                  value={settingsCustomQrUrl}
+                  onChange={(e) => setSettingsCustomQrUrl(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-mono"
+                />
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  {isHindi 
+                    ? 'यदि आपके पास बैंक या Google Pay / PhonePe का मुद्रित QR कोड है, तो उसका लिंक यहाँ दर्ज करें।' 
+                    : 'If you have a printed bank QR code image, paste the image link here. Leave blank for auto-generated QR.'}
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

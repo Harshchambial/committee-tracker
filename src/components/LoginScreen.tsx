@@ -13,9 +13,11 @@ import {
   Eye, 
   EyeOff,
   ShieldCheck,
-  CheckCircle2
+  CheckCircle2,
+  Languages
 } from 'lucide-react';
 import { AuthUser, CommitteeSettings } from '@/types';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface LoginScreenProps {
   settings: CommitteeSettings | null;
@@ -26,6 +28,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   settings,
   onLoginSuccess
 }) => {
+  const { language, toggleLanguage, isHindi } = useLanguage();
   const [loginRole, setLoginRole] = useState<'MEMBER' | 'ADMIN'>('MEMBER');
 
   // Member form fields
@@ -116,6 +119,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 right-0 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
 
+      {/* Language Switcher in top right */}
+      <div className="absolute top-4 right-4 z-20">
+        <button
+          onClick={toggleLanguage}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/20 transition cursor-pointer backdrop-blur-xs shadow-lg"
+        >
+          <Languages className="w-3.5 h-3.5 text-amber-400" />
+          <span>{language === 'hi' ? 'English' : '🇮🇳 हिन्दी'}</span>
+        </button>
+      </div>
+
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 text-center">
         {/* Brand Icon */}
         <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 flex items-center justify-center mx-auto shadow-xl shadow-emerald-500/20 mb-3">
@@ -123,10 +137,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         </div>
 
         <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-          {settings?.committeeName || 'Vikas Sahayog Samiti'}
+          {settings?.committeeName || (isHindi ? 'विकास सहयोग समिति' : 'Vikas Sahayog Samiti')}
         </h1>
         <p className="mt-1 text-xs sm:text-sm text-slate-400 max-w-xs mx-auto">
-          Private & Protected Committee Portal. Only registered members can access ledger data.
+          {isHindi 
+            ? 'निजी एवं सुरक्षित समिति पोर्टल। केवल पंजीकृत सदस्य ही बहीखाता देख सकते हैं।' 
+            : 'Private & Protected Committee Portal. Only registered members can access ledger data.'}
         </p>
       </div>
 
@@ -148,7 +164,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               }`}
             >
               <User className="w-3.5 h-3.5" />
-              Member Login
+              {isHindi ? 'सदस्य लॉगिन' : 'Member Login'}
             </button>
             <button
               type="button"
@@ -163,7 +179,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               }`}
             >
               <Lock className="w-3.5 h-3.5" />
-              Admin Portal
+              {isHindi ? 'व्यवस्थापक पोर्टल' : 'Admin Portal'}
             </button>
           </div>
 
@@ -180,7 +196,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             <form onSubmit={handleMemberLogin} className="space-y-4">
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Registered Mobile Number *
+                  {isHindi ? 'पंजीकृत मोबाइल नंबर *' : 'Registered Mobile Number *'}
                 </label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-xs sm:text-sm">
@@ -199,19 +215,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   />
                 </div>
                 <p className="text-[10px] text-slate-400 mt-1">
-                  Enter the phone number registered with the committee
+                  {isHindi ? 'समिति में पंजीकृत 10-अंकों का मोबाइल नंबर दर्ज करें' : 'Enter the phone number registered with the committee'}
                 </p>
               </div>
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Your Name (Optional)
+                  {isHindi ? 'आपका नाम (वैकल्पिक)' : 'Your Name (Optional)'}
                 </label>
                 <div className="relative">
                   <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder="e.g. Ramesh Gupta"
+                    placeholder={isHindi ? 'जैसे: रमेश गुप्ता' : 'e.g. Ramesh Gupta'}
                     value={memberName}
                     onChange={(e) => setMemberName(e.target.value)}
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
@@ -221,7 +237,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Email Address (Optional)
+                  {isHindi ? 'ईमेल पता (वैकल्पिक)' : 'Email Address (Optional)'}
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -240,7 +256,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 disabled={isLoading || memberPhone.length < 10}
                 className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm tracking-wide shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 transition cursor-pointer active:scale-98 disabled:opacity-50 mt-2"
               >
-                <span>{isLoading ? 'Verifying Membership...' : 'Enter Committee Portal'}</span>
+                <span>{isLoading ? (isHindi ? 'सत्यापित हो रहा है...' : 'Verifying Membership...') : (isHindi ? 'समिति पोर्टल में प्रवेश करें' : 'Enter Committee Portal')}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
@@ -251,12 +267,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             <form onSubmit={handleAdminLogin} className="space-y-4">
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Admin Secret Password / PIN *
+                  {isHindi ? 'व्यवस्थापक पासवर्ड / पिन *' : 'Admin Secret Password / PIN *'}
                 </label>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="Enter Admin PIN or Password"
+                    placeholder={isHindi ? 'पिन दर्ज करें' : 'Enter Admin PIN or Password'}
                     value={adminPassword}
                     onChange={(e) => setAdminPassword(e.target.value)}
                     required
@@ -271,7 +287,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   </button>
                 </div>
                 <p className="text-[10px] text-slate-400 mt-1">
-                  Default initial PIN is <strong className="font-mono text-slate-700">1234</strong>
+                  {isHindi ? 'डिफ़ॉल्ट प्रारंभिक पिन है' : 'Default initial PIN is'} <strong className="font-mono text-slate-700">1234</strong>
                 </p>
               </div>
 
@@ -280,7 +296,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 disabled={isLoading || !adminPassword}
                 className="w-full py-3.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-sm tracking-wide shadow-lg flex items-center justify-center gap-2 transition cursor-pointer active:scale-98 disabled:opacity-50 mt-2"
               >
-                <span>{isLoading ? 'Unlocking Panel...' : 'Unlock Admin Panel'}</span>
+                <span>{isLoading ? (isHindi ? 'खोल रहा है...' : 'Unlocking Panel...') : (isHindi ? 'व्यवस्थापक पैनल खोलें' : 'Unlock Admin Panel')}</span>
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
               </button>
             </form>
@@ -291,10 +307,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         <div className="mt-6 text-center space-y-1 text-xs text-slate-400">
           <p className="flex items-center justify-center gap-1.5 font-medium">
             <Shield className="w-3.5 h-3.5 text-emerald-400" />
-            End-to-End Privacy Protected
+            {isHindi ? 'पूर्णतः सुरक्षित एवं निजी' : 'End-to-End Privacy Protected'}
           </p>
           <p className="text-[11px] text-slate-500">
-            Want to join? Contact committee organizer to register your phone number.
+            {isHindi ? 'सदस्यता हेतु समिति व्यवस्थापक से संपर्क कर अपना नंबर जुड़वाएं।' : 'Want to join? Contact committee organizer to register your phone number.'}
           </p>
         </div>
       </div>

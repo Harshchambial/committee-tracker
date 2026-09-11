@@ -18,6 +18,7 @@ import {
   QrCode
 } from 'lucide-react';
 import { MemberMatrixRow, PaymentRecord, CommitteeSettings } from '@/types';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface PaymentMatrixProps {
   matrix: MemberMatrixRow[];
@@ -30,11 +31,6 @@ interface PaymentMatrixProps {
   onOpenAdminVerify: (paymentId: string) => void;
 }
 
-const MONTH_NAMES_SHORT = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-];
-
 export const PaymentMatrix: React.FC<PaymentMatrixProps> = ({
   matrix,
   year,
@@ -45,6 +41,7 @@ export const PaymentMatrix: React.FC<PaymentMatrixProps> = ({
   isAdminLoggedIn,
   onOpenAdminVerify
 }) => {
+  const { t, isHindi, getMonthShort, getMonthName } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'ALL' | 'PENDING' | 'PAID'>('ALL');
   // Default to Card view on mobile, Table on desktop
@@ -64,12 +61,10 @@ export const PaymentMatrix: React.FC<PaymentMatrixProps> = ({
     if (!matchesSearch) return false;
 
     if (filterType === 'PENDING') {
-      const currentMonthStatus = row.months[currentMonth]?.status;
-      return currentMonthStatus === 'DUE' || currentMonthStatus === 'PENDING_APPROVAL';
+      return row.months[currentMonth]?.status !== 'PAID';
     }
     if (filterType === 'PAID') {
-      const currentMonthStatus = row.months[currentMonth]?.status;
-      return currentMonthStatus === 'PAID';
+      return row.months[currentMonth]?.status === 'PAID';
     }
     return true;
   });
@@ -91,7 +86,7 @@ export const PaymentMatrix: React.FC<PaymentMatrixProps> = ({
     const memberName = row.member.name;
     const phone = row.member.phone.replace(/\D/g, '');
     const cleanPhone = phone.startsWith('91') ? phone : `91${phone}`;
-    const monthName = MONTH_NAMES_SHORT[month - 1];
+    const monthName = getMonthName(month);
     const amount = settings?.monthlyAmount || 1000;
     const committeeName = settings?.committeeName || 'Committee';
 
@@ -270,23 +265,23 @@ export const PaymentMatrix: React.FC<PaymentMatrixProps> = ({
                     {/* Current Month Highlight Bar */}
                     <div className="mt-3.5 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-                        <span>{MONTH_NAMES_SHORT[currentMonth - 1]} {year}:</span>
+                        <span>{getMonthShort(currentMonth)} {year}:</span>
                         {isCurrentPaid && (
                           <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md font-extrabold">
                             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            Paid ₹1,000
+                            {isHindi ? 'जमा ₹1,000' : 'Paid ₹1,000'}
                           </span>
                         )}
                         {isCurrentPending && (
                           <span className="inline-flex items-center gap-1 text-[11px] text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md font-bold">
                             <Clock className="w-3 h-3 text-amber-600" />
-                            Review
+                            {isHindi ? 'जांच में' : 'Review'}
                           </span>
                         )}
                         {!isCurrentPaid && !isCurrentPending && (
                           <span className="inline-flex items-center gap-1 text-[11px] text-rose-700 bg-rose-100 px-2 py-0.5 rounded-md font-bold">
                             <AlertCircle className="w-3 h-3" />
-                            Due ₹1,000
+                            {isHindi ? 'बाकी ₹1,000' : 'Due ₹1,000'}
                           </span>
                         )}
                       </div>
@@ -298,7 +293,7 @@ export const PaymentMatrix: React.FC<PaymentMatrixProps> = ({
                             className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-white hover:bg-slate-100 px-2 py-1 rounded-lg border border-slate-200 transition cursor-pointer"
                           >
                             <Receipt className="w-3 h-3 text-emerald-600" />
-                            Receipt
+                            {isHindi ? 'रसीद' : 'Receipt'}
                           </button>
                         )}
                         {!isCurrentPaid && !isCurrentPending && (
@@ -307,7 +302,7 @@ export const PaymentMatrix: React.FC<PaymentMatrixProps> = ({
                             className="inline-flex items-center gap-1 text-[11px] font-extrabold text-white bg-emerald-600 hover:bg-emerald-500 px-2.5 py-1 rounded-lg shadow-xs transition cursor-pointer"
                           >
                             <QrCode className="w-3 h-3" />
-                            Pay
+                            {isHindi ? 'दें' : 'Pay'}
                           </button>
                         )}
                         {isAdminLoggedIn && !isCurrentPaid && !isCurrentPending && (
@@ -329,14 +324,13 @@ export const PaymentMatrix: React.FC<PaymentMatrixProps> = ({
                       onClick={() => toggleExpand(row.member.id)}
                       className="w-full py-2 px-4 bg-slate-50/70 hover:bg-slate-100 text-[11px] font-bold text-slate-600 flex items-center justify-between transition cursor-pointer"
                     >
-                      <span>All 12 Months Status ({year})</span>
+                      <span>{isHindi ? `सभी 12 माह स्थिति (${year})` : `All 12 Months Status (${year})`}</span>
                       {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                     </button>
 
                     {isExpanded && (
                       <div className="p-3 bg-white grid grid-cols-4 sm:grid-cols-6 gap-1.5 border-t border-slate-100">
-                        {MONTH_NAMES_SHORT.map((mName, idx) => {
-                          const mNum = idx + 1;
+                        {[1,2,3,4,5,6,7,8,9,10,11,12].map(mNum => {
                           const mData = row.months[mNum];
                           const status = mData?.status;
                           const isCurrent = year === currentYear && mNum === currentMonth;
@@ -354,7 +348,7 @@ export const PaymentMatrix: React.FC<PaymentMatrixProps> = ({
                                   : 'bg-slate-50 border-slate-100 text-slate-400'
                               } ${isCurrent ? 'ring-2 ring-emerald-500/50' : ''}`}
                             >
-                              <div className="text-[10px] font-bold uppercase">{mName}</div>
+                              <div className="text-[10px] font-bold uppercase">{getMonthShort(mNum)}</div>
                               <div className="text-[10px] font-extrabold mt-0.5">
                                 {status === 'PAID' ? (
                                   <button
@@ -365,13 +359,13 @@ export const PaymentMatrix: React.FC<PaymentMatrixProps> = ({
                                     <span>₹1k</span>
                                   </button>
                                 ) : status === 'PENDING_APPROVAL' ? (
-                                  <span>Review</span>
+                                  <span>{isHindi ? 'जांच' : 'Rev'}</span>
                                 ) : status === 'DUE' ? (
                                   <button 
                                     onClick={() => onPayForMember(row.member.id, mNum, year)}
                                     className="text-rose-700 hover:underline"
                                   >
-                                    Due
+                                    {isHindi ? 'बाकी' : 'Due'}
                                   </button>
                                 ) : (
                                   '-'
@@ -398,14 +392,14 @@ export const PaymentMatrix: React.FC<PaymentMatrixProps> = ({
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
                   <th className="py-3 px-3.5 sticky left-0 z-20 bg-slate-50 min-w-[160px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
-                    Member Details
+                    {isHindi ? 'कोर सदस्य विवरण' : 'Member Details'}
                   </th>
-                  {MONTH_NAMES_SHORT.map((mName, idx) => {
-                    const mNum = idx + 1;
+                  {[1,2,3,4,5,6,7,8,9,10,11,12].map(mNum => {
+                    const mName = getMonthShort(mNum);
                     const isCurrent = year === currentYear && mNum === currentMonth;
                     return (
                       <th 
-                        key={mName} 
+                        key={mNum} 
                         className={`py-3 px-2 text-center min-w-[65px] ${
                           isCurrent ? 'bg-emerald-50 text-emerald-900 border-x border-emerald-200 font-extrabold' : ''
                         }`}
@@ -415,7 +409,7 @@ export const PaymentMatrix: React.FC<PaymentMatrixProps> = ({
                     );
                   })}
                   <th className="py-3 px-3 text-right min-w-[90px] bg-slate-50">
-                    Total
+                    {isHindi ? 'कुल जमा' : 'Total'}
                   </th>
                 </tr>
               </thead>
@@ -434,8 +428,7 @@ export const PaymentMatrix: React.FC<PaymentMatrixProps> = ({
                       </div>
                     </td>
 
-                    {MONTH_NAMES_SHORT.map((_, idx) => {
-                      const mNum = idx + 1;
+                    {[1,2,3,4,5,6,7,8,9,10,11,12].map(mNum => {
                       const monthData = row.months[mNum];
                       const status = monthData?.status;
                       return (

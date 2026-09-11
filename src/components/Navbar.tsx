@@ -12,9 +12,13 @@ import {
   ShieldCheck, 
   LogOut,
   KeyRound,
-  User as UserIcon
+  User as UserIcon,
+  HeartHandshake,
+  Languages,
+  Sparkles
 } from 'lucide-react';
 import { CommitteeSettings, TreasurySummary, AuthUser } from '@/types';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface NavbarProps {
   activeTab: string;
@@ -39,22 +43,24 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAdminProfile,
   pendingApprovals
 }) => {
+  const { t, language, toggleLanguage, isHindi } = useLanguage();
   const isAdmin = currentUser?.role === 'ADMIN';
 
   const desktopTabs = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'matrix', label: 'Payment Matrix', icon: Table2 },
-    { id: 'pay', label: 'Pay Dues (UPI)', icon: QrCode, highlight: true },
-    { id: 'my-ledger', label: 'My Ledger', icon: UserCheck },
-    { id: 'expenses', label: 'Fund Utilization', icon: ReceiptIndianRupee },
+    { id: 'overview', label: t('tabOverview'), icon: LayoutDashboard },
+    { id: 'jan-sahayog', label: t('tabJanSahayog'), icon: HeartHandshake },
+    { id: 'matrix', label: t('tabMatrix'), icon: Table2 },
+    { id: 'pay', label: t('tabPay'), icon: QrCode, highlight: true },
+    { id: 'my-ledger', label: t('tabLedger'), icon: UserCheck },
+    { id: 'expenses', label: t('tabExpenses'), icon: ReceiptIndianRupee },
   ];
 
   const mobileTabs = [
-    { id: 'overview', label: 'Home', icon: LayoutDashboard },
-    { id: 'matrix', label: 'Matrix', icon: Table2 },
-    { id: 'pay', label: 'Pay ₹1k', icon: QrCode, isHero: true },
-    { id: 'my-ledger', label: 'Ledger', icon: UserCheck },
-    { id: 'expenses', label: 'Expenses', icon: ReceiptIndianRupee },
+    { id: 'overview', label: isHindi ? 'कोष' : 'Home', icon: LayoutDashboard },
+    { id: 'jan-sahayog', label: isHindi ? 'सहयोग' : 'Sahayog', icon: HeartHandshake },
+    { id: 'pay', label: isHindi ? 'सहयोग दें' : 'Donate', icon: QrCode, isHero: true },
+    { id: 'matrix', label: isHindi ? 'मासिक' : 'Matrix', icon: Table2 },
+    { id: 'my-ledger', label: isHindi ? 'रसीदें' : 'Receipts', icon: UserCheck },
   ];
 
   return (
@@ -68,30 +74,43 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="flex items-center gap-2.5 sm:gap-3 cursor-pointer min-w-0" 
               onClick={() => setActiveTab('overview')}
             >
-              <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/20 shrink-0">
+              <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-amber-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/20 shrink-0">
                 <Building2 className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <h1 className="text-sm sm:text-xl font-black text-slate-900 tracking-tight leading-none truncate max-w-[130px] sm:max-w-xs">
-                    {settings?.committeeName || 'Committee Fund'}
+                  <h1 className="text-sm sm:text-xl font-black text-slate-900 tracking-tight leading-none truncate max-w-[125px] sm:max-w-xs">
+                    {settings?.committeeName || (isHindi ? 'विकास सहयोग समिति' : 'Vikas Samiti')}
                   </h1>
-                  <span className="inline-flex items-center px-1.5 py-0.2 rounded-md text-[10px] sm:text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-                    ₹{settings?.monthlyAmount || 1000}
+                  <span className="inline-flex items-center px-1.5 py-0.2 rounded-md text-[10px] sm:text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+                    ₹{settings?.monthlyAmount || 1000}/mo
                   </span>
                 </div>
                 <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 truncate hidden sm:block">
-                  {settings?.tagline || '100% Transparent Community Fund Portal'}
+                  {settings?.tagline || t('committeeTagline')}
                 </p>
               </div>
             </div>
 
-            {/* Right Side: User Profile & Actions */}
-            <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+            {/* Right Side: Language Toggle + Balance + User Profile */}
+            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+              {/* Language Switcher Toggle */}
+              <button
+                type="button"
+                onClick={toggleLanguage}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200/80 text-amber-900 text-xs font-black transition cursor-pointer active:scale-95 shadow-2xs"
+                title={isHindi ? 'Switch to English' : 'हिन्दी में बदलें'}
+              >
+                <Languages className="w-3.5 h-3.5 text-orange-600" />
+                <span className="font-bold">{language === 'hi' ? 'English' : 'हिन्दी'}</span>
+              </button>
+
               {/* Net Treasury Balance */}
-              <div className="flex items-center bg-slate-100/90 px-2 sm:px-3.5 py-1 sm:py-1.5 rounded-xl border border-slate-200">
+              <div className="flex items-center bg-slate-100/90 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-slate-200">
                 <div className="flex flex-col text-right">
-                  <span className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-500 leading-none">Balance</span>
+                  <span className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-500 leading-none">
+                    {isHindi ? 'कोष' : 'Balance'}
+                  </span>
                   <span className="text-xs sm:text-base font-black text-emerald-600 flex items-center justify-end leading-tight mt-0.5">
                     <IndianRupee className="w-3 h-3 sm:w-3.5 sm:h-3.5 inline mr-0.5 stroke-[2.5]" />
                     {(summary?.netBalance ?? 0).toLocaleString('en-IN')}
@@ -107,33 +126,39 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className={`flex items-center gap-1.5 sm:gap-2 bg-slate-50 border border-slate-200/80 px-2 sm:px-2.5 py-1 rounded-xl transition text-left ${
                     isAdmin ? 'hover:bg-amber-50 hover:border-amber-300 cursor-pointer' : 'cursor-default'
                   }`}
-                  title={isAdmin ? "Click to change Admin Name & Password" : currentUser.name}
+                  title={isAdmin ? "Edit Admin Name & Password" : currentUser.name}
                 >
                   <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center text-xs font-black text-white ${
                     isAdmin ? 'bg-amber-600' : 'bg-emerald-600'
                   }`}>
                     {currentUser.name.charAt(0)}
                   </div>
-                  <div className="text-left text-xs">
-                    <div className="font-bold text-slate-900 leading-tight max-w-[85px] sm:max-w-[120px] truncate">{currentUser.name}</div>
+                  <div className="text-left text-xs hidden sm:block">
+                    <div className="font-bold text-slate-900 leading-tight max-w-[100px] truncate">{currentUser.name}</div>
                     <div className="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
-                      <span>{isAdmin ? 'Admin' : 'Member'}</span>
-                      {isAdmin && <span className="text-amber-600 font-bold text-[9px] hidden sm:inline">• Edit Name</span>}
+                      <span>{isAdmin ? (isHindi ? 'व्यवस्थापक' : 'Admin') : (isHindi ? 'सदस्य' : 'Member')}</span>
+                      {isAdmin && <span className="text-amber-600 font-bold text-[9px]">• Edit</span>}
                     </div>
                   </div>
                 </button>
               )}
 
-              {/* Admin Profile & Password Button */}
-              {isAdmin && onOpenAdminProfile && (
+              {/* Admin Portal Tab Button for Desktop */}
+              {isAdmin && (
                 <button
                   type="button"
-                  onClick={onOpenAdminProfile}
-                  className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold flex items-center gap-1 border border-amber-200 transition cursor-pointer"
-                  title="Edit Admin Name & Password"
+                  onClick={() => setActiveTab('admin')}
+                  className={`hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-xl font-bold text-xs border transition cursor-pointer ${
+                    activeTab === 'admin'
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200'
+                  }`}
                 >
-                  <UserIcon className="w-3.5 h-3.5 text-amber-700" />
-                  <span className="hidden sm:inline">Admin Profile</span>
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
+                  <span>{t('tabAdmin')}</span>
+                  {pendingApprovals > 0 && (
+                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                  )}
                 </button>
               )}
 
@@ -141,33 +166,33 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 type="button"
                 onClick={onLogout}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs font-bold rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-600 border border-slate-200 transition cursor-pointer"
-                title="Sign out of committee portal"
+                className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-700 text-xs font-bold flex items-center gap-1 border border-slate-200 transition cursor-pointer"
+                title={t('logout')}
               >
                 <LogOut className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Logout</span>
+                <span className="hidden sm:inline">{t('logout')}</span>
               </button>
             </div>
           </div>
 
-          {/* Desktop Tab Navigation */}
-          <div className="hidden sm:flex items-center gap-1 overflow-x-auto no-scrollbar border-t border-slate-100 py-2">
-            {desktopTabs.map(tab => {
+          {/* Desktop Navigation Tabs Bar */}
+          <nav className="hidden sm:flex items-center space-x-1 py-2 border-t border-slate-100 overflow-x-auto">
+            {desktopTabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition cursor-pointer ${
-                    isActive
-                      ? 'bg-emerald-600 text-white shadow-sm'
-                      : tab.highlight
-                      ? 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
+                  className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap cursor-pointer ${
+                    tab.highlight
+                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm hover:from-emerald-500 hover:to-teal-500'
+                      : isActive
+                      ? 'bg-slate-900 text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-white' : tab.highlight ? 'text-emerald-700' : 'text-slate-500'}`} />
+                  <Icon className="w-4 h-4" />
                   <span>{tab.label}</span>
                 </button>
               );
@@ -176,82 +201,72 @@ export const Navbar: React.FC<NavbarProps> = ({
             {isAdmin && (
               <button
                 onClick={() => setActiveTab('admin')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition cursor-pointer ml-auto ${
+                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap cursor-pointer ${
                   activeTab === 'admin'
-                    ? 'bg-amber-600 text-white shadow-sm'
-                    : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200'
+                    ? 'bg-slate-900 text-white'
+                    : 'text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200'
                 }`}
               >
-                <ShieldCheck className="w-4 h-4" />
-                <span>Admin Panel</span>
+                <ShieldCheck className="w-4 h-4 text-amber-600" />
+                <span>{t('tabAdmin')}</span>
                 {pendingApprovals > 0 && (
-                  <span className="bg-rose-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full ml-1">
+                  <span className="px-1.5 py-0.2 rounded-full bg-red-500 text-white text-[10px] font-black">
                     {pendingApprovals}
                   </span>
                 )}
               </button>
             )}
-          </div>
+          </nav>
         </div>
       </header>
 
-      {/* Mobile Bottom Navigation Bar */}
-      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-lg border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] px-2 py-1 pb-safe">
-        <div className="flex items-center justify-around">
-          {mobileTabs.map(tab => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
+      {/* Mobile Bottom Navigation Bar (Sticky Thumb-Friendly) */}
+      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-lg px-2 py-1.5 flex items-center justify-around">
+        {mobileTabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
 
-            if (tab.isHero) {
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className="flex flex-col items-center justify-center -mt-5 cursor-pointer group"
-                >
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/40 transform active:scale-90 transition border-2 border-white">
-                    <Icon className="w-6 h-6 stroke-[2.5]" />
-                  </div>
-                  <span className="text-[10px] font-black text-emerald-700 mt-0.5">
-                    {tab.label}
-                  </span>
-                </button>
-              );
-            }
-
+          if (tab.isHero) {
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex flex-col items-center justify-center py-1 px-2 rounded-lg transition cursor-pointer ${
-                  isActive ? 'text-emerald-700' : 'text-slate-500 hover:text-slate-900'
-                }`}
+                className="flex flex-col items-center justify-center -mt-5 bg-gradient-to-tr from-emerald-600 to-teal-500 text-white w-12 h-12 rounded-2xl shadow-lg shadow-emerald-500/30 transition active:scale-90 cursor-pointer"
               >
-                <Icon className={`w-5 h-5 ${isActive ? 'text-emerald-600 stroke-[2.5]' : 'text-slate-400'}`} />
-                <span className={`text-[10px] font-bold mt-0.5 ${isActive ? 'text-emerald-700 font-extrabold' : 'text-slate-500'}`}>
-                  {tab.label}
-                </span>
+                <Icon className="w-5 h-5 stroke-[2.5]" />
+                <span className="text-[9px] font-black mt-0.5 leading-none">{tab.label}</span>
               </button>
             );
-          })}
+          }
 
-          {isAdmin && (
+          return (
             <button
-              onClick={() => setActiveTab('admin')}
-              className={`flex flex-col items-center justify-center py-1 px-2 rounded-lg transition cursor-pointer relative ${
-                activeTab === 'admin' ? 'text-amber-700' : 'text-slate-500'
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition cursor-pointer ${
+                isActive ? 'text-emerald-700 font-bold' : 'text-slate-400 hover:text-slate-700'
               }`}
             >
-              <ShieldCheck className={`w-5 h-5 ${activeTab === 'admin' ? 'text-amber-600 stroke-[2.5]' : 'text-slate-400'}`} />
-              <span className={`text-[10px] font-bold mt-0.5 ${activeTab === 'admin' ? 'text-amber-700' : 'text-slate-500'}`}>
-                Admin
-              </span>
-              {pendingApprovals > 0 && (
-                <span className="absolute top-0 right-1 w-2 h-2 rounded-full bg-rose-600 ring-2 ring-white animate-pulse" />
-              )}
+              <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5]' : 'stroke-2'}`} />
+              <span className="text-[10px] mt-0.5 leading-none">{tab.label}</span>
             </button>
-          )}
-        </div>
+          );
+        })}
+
+        {isAdmin && (
+          <button
+            onClick={() => setActiveTab('admin')}
+            className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition cursor-pointer relative ${
+              activeTab === 'admin' ? 'text-amber-700 font-bold' : 'text-slate-400 hover:text-slate-700'
+            }`}
+          >
+            <ShieldCheck className="w-5 h-5 stroke-2" />
+            <span className="text-[10px] mt-0.5 leading-none">{isHindi ? 'व्यवस्थापक' : 'Admin'}</span>
+            {pendingApprovals > 0 && (
+              <span className="absolute top-0.5 right-2 w-2 h-2 rounded-full bg-red-500" />
+            )}
+          </button>
+        )}
       </nav>
     </>
   );

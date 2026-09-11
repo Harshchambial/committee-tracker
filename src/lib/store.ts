@@ -9,7 +9,8 @@ import {
   TreasurySummary, 
   MemberMatrixRow, 
   PaymentStatus,
-  PaymentMethod 
+  PaymentMethod,
+  ContributionType 
 } from '@/types';
 import { supabase, isSupabaseConfigured } from './supabase';
 
@@ -110,6 +111,7 @@ export async function getAllMembers(): Promise<Member[]> {
           joinedYear: m.joined_year || 2026,
           status: m.status || 'ACTIVE',
           role: m.role || 'MEMBER',
+          memberType: (m.member_type as 'CORE' | 'VOLUNTARY') || 'CORE',
           notes: m.notes || undefined
         }));
       }
@@ -118,12 +120,19 @@ export async function getAllMembers(): Promise<Member[]> {
     }
   }
   const db = getDatabase();
-  return db.members;
+  return db.members.map(m => ({
+    ...m,
+    memberType: m.memberType || 'CORE'
+  }));
 }
 
 export async function addMember(memberData: Omit<Member, 'id'>): Promise<Member> {
   const id = `mem_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-  const newMember: Member = { ...memberData, id };
+  const newMember: Member = { 
+    ...memberData, 
+    id,
+    memberType: memberData.memberType || 'CORE'
+  };
 
   if (isSupabaseConfigured && supabase) {
     try {
@@ -136,6 +145,7 @@ export async function addMember(memberData: Omit<Member, 'id'>): Promise<Member>
         joined_year: newMember.joinedYear,
         status: newMember.status,
         role: newMember.role,
+        member_type: newMember.memberType,
         notes: newMember.notes
       });
     } catch (e) {
@@ -157,6 +167,7 @@ export async function updateMember(id: string, updates: Partial<Member>): Promis
       if (updates.phone !== undefined) updatePayload.phone = updates.phone;
       if (updates.status !== undefined) updatePayload.status = updates.status;
       if (updates.role !== undefined) updatePayload.role = updates.role;
+      if (updates.memberType !== undefined) updatePayload.member_type = updates.memberType;
       if (updates.notes !== undefined) updatePayload.notes = updates.notes;
       await supabase.from('members').update(updatePayload).eq('id', id);
     } catch (e) {
@@ -204,6 +215,9 @@ export async function getAllPayments(): Promise<PaymentRecord[]> {
           utrNumber: p.utr_number || undefined,
           method: p.method as PaymentMethod,
           status: p.status as PaymentStatus,
+          contributionType: (p.contribution_type as ContributionType) || (Number(p.amount) === 1000 ? 'CORE_MONTHLY' : 'PUBLIC_SEVA'),
+          purpose: p.purpose || undefined,
+          contributorPhone: p.contributor_phone || undefined,
           paidAt: p.paid_at,
           verifiedAt: p.verified_at || undefined,
           verifiedBy: p.verified_by || undefined,
@@ -216,21 +230,24 @@ export async function getAllPayments(): Promise<PaymentRecord[]> {
     }
   }
   const db = getDatabase();
-  return db.payments;
+  return db.payments.map(p => ({
+    ...p,
+    contributionType: p.contributionType || (p.amount === 1000 ? 'CORE_MONTHLY' : 'PUBLIC_SEVA')
+  }));
 }
 
 export async function submitPayment(data: {
-  memberId: string;
-  month: number;
-  year: number;
+  memberId?: string;
+  contributorName?: string;
+  contributorPhone?: string;
+  month?: number;
+  year?: number;
   amount: number;
   utrNumber: string;
+  contributionType?: ContributionType;
+  purpose?: string;
   notes?: string;
 }): Promise<PaymentRecord> {
-  const members = await getAllMembers();
-  const member = members.find(m => m.id === data.memberId);
-  if (!member) throw new Error('Member not found');
-
   const cleanUtr = data.utrNumber.trim().replace(/\s+/g, '');
   if (!cleanUtr || cleanUtr.length < 6) {
     throw new Error('Please enter a valid 12-digit UPI Reference / UTR Number.');
@@ -247,32 +264,61 @@ export async function submitPayment(data: {
     throw new Error(`This UTR number (${cleanUtr}) has already been recorded for ${existingUtr.memberName}.`);
   }
 
-  const existingMonthPayment = payments.find(p => 
-    p.memberId === data.memberId && 
-    p.month === data.month && 
-    p.year === data.year && 
-    (p.status === 'VERIFIED' || p.status === 'PENDING_APPROVAL')
-  );
+  const isPublicSeva = data.contributionType === 'PUBLIC_SEVA';
+  const members = await getAllMembers();
+  let member = data.memberId ? members.find(m => m.id === data.memberId) : undefined;
 
-  if (existingMonthPayment) {
-    if (existingMonthPayment.status === 'VERIFIED') {
-      throw new Error(`Payment for ${getMonthName(data.month)} ${data.year} is already recorded and verified!`);
-    } else {
-      throw new Error(`A payment for ${getMonthName(data.month)} ${data.year} is already pending admin verification.`);
+  let memberName = '';
+  let memberId = '';
+
+  const currentDate = new Date();
+  const month = data.month || (currentDate.getMonth() + 1);
+  const year = data.year || currentDate.getFullYear();
+
+  if (isPublicSeva) {
+    memberName = (data.contributorName || member?.name || 'Public Contributor').trim();
+    if (!memberName) throw new Error('Please provide your name for the public contribution receipt.');
+    memberId = data.memberId || `guest_${Date.now()}`;
+  } else {
+    // Core Member Monthly Flow
+    if (!data.memberId) throw new Error('Please select your name from the Core Members list.');
+    member = members.find(m => m.id === data.memberId);
+    if (!member) throw new Error('Member not found');
+    memberName = member.name;
+    memberId = member.id;
+
+    // Check if month already paid or in review
+    const existingMonthPayment = payments.find(p => 
+      p.memberId === memberId && 
+      p.month === month && 
+      p.year === year && 
+      (p.contributionType || 'CORE_MONTHLY') === 'CORE_MONTHLY' &&
+      (p.status === 'VERIFIED' || p.status === 'PENDING_APPROVAL')
+    );
+
+    if (existingMonthPayment) {
+      if (existingMonthPayment.status === 'VERIFIED') {
+        throw new Error(`Payment for ${getMonthName(month)} ${year} is already recorded and verified!`);
+      } else {
+        throw new Error(`A payment for ${getMonthName(month)} ${year} is already pending admin verification.`);
+      }
     }
   }
 
   const settings = await getSettings();
   const paymentRecord: PaymentRecord = {
     id: `pay_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-    memberId: member.id,
-    memberName: member.name,
-    month: data.month,
-    year: data.year,
-    amount: data.amount || settings.monthlyAmount,
+    memberId,
+    memberName,
+    month,
+    year,
+    amount: data.amount || (isPublicSeva ? 500 : settings.monthlyAmount),
     utrNumber: cleanUtr,
     method: 'UPI_QR',
     status: 'PENDING_APPROVAL',
+    contributionType: isPublicSeva ? 'PUBLIC_SEVA' : 'CORE_MONTHLY',
+    purpose: data.purpose || (isPublicSeva ? 'Community Welfare / Public Seva' : undefined),
+    contributorPhone: data.contributorPhone,
     paidAt: new Date().toISOString(),
     notes: data.notes
   };
@@ -289,6 +335,9 @@ export async function submitPayment(data: {
         utr_number: paymentRecord.utrNumber,
         method: paymentRecord.method,
         status: paymentRecord.status,
+        contribution_type: paymentRecord.contributionType,
+        purpose: paymentRecord.purpose,
+        contributor_phone: paymentRecord.contributorPhone,
         paid_at: paymentRecord.paidAt,
         notes: paymentRecord.notes
       });
@@ -304,41 +353,66 @@ export async function submitPayment(data: {
 }
 
 export async function logOfflinePayment(data: {
-  memberId: string;
-  month: number;
-  year: number;
+  memberId?: string;
+  contributorName?: string;
+  contributorPhone?: string;
+  month?: number;
+  year?: number;
   amount: number;
   method: PaymentMethod;
+  contributionType?: ContributionType;
+  purpose?: string;
   notes?: string;
   verifiedBy: string;
 }): Promise<PaymentRecord> {
+  const isPublicSeva = data.contributionType === 'PUBLIC_SEVA';
   const members = await getAllMembers();
-  const member = members.find(m => m.id === data.memberId);
-  if (!member) throw new Error('Member not found');
+  let member = data.memberId ? members.find(m => m.id === data.memberId) : undefined;
 
-  const payments = await getAllPayments();
-  const existing = payments.find(p => 
-    p.memberId === data.memberId && 
-    p.month === data.month && 
-    p.year === data.year && 
-    p.status === 'VERIFIED'
-  );
+  let memberName = '';
+  let memberId = '';
+  const currentDate = new Date();
+  const month = data.month || (currentDate.getMonth() + 1);
+  const year = data.year || currentDate.getFullYear();
 
-  if (existing) {
-    throw new Error(`Payment for ${getMonthName(data.month)} ${data.year} is already verified.`);
+  if (isPublicSeva) {
+    memberName = (data.contributorName || member?.name || 'Public Contributor').trim();
+    memberId = data.memberId || `guest_${Date.now()}`;
+  } else {
+    if (!data.memberId) throw new Error('Please select a member.');
+    member = members.find(m => m.id === data.memberId);
+    if (!member) throw new Error('Member not found');
+    memberName = member.name;
+    memberId = member.id;
+
+    const payments = await getAllPayments();
+    const existing = payments.find(p => 
+      p.memberId === memberId && 
+      p.month === month && 
+      p.year === year && 
+      (p.contributionType || 'CORE_MONTHLY') === 'CORE_MONTHLY' &&
+      p.status === 'VERIFIED'
+    );
+
+    if (existing) {
+      throw new Error(`Payment for ${getMonthName(month)} ${year} is already verified.`);
+    }
   }
 
   const settings = await getSettings();
   const paymentRecord: PaymentRecord = {
     id: `pay_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-    memberId: member.id,
-    memberName: member.name,
-    month: data.month,
-    year: data.year,
-    amount: data.amount || settings.monthlyAmount,
+    memberId,
+    memberName,
+    month,
+    year,
+    amount: data.amount || (isPublicSeva ? 500 : settings.monthlyAmount),
     utrNumber: data.method === 'CASH' ? `CASH-${Date.now().toString().slice(-6)}` : undefined,
     method: data.method,
     status: 'VERIFIED',
+    contributionType: isPublicSeva ? 'PUBLIC_SEVA' : 'CORE_MONTHLY',
+    purpose: data.purpose || (isPublicSeva ? 'Community Welfare / Public Seva' : undefined),
+    contributorPhone: data.contributorPhone,
     paidAt: new Date().toISOString(),
     verifiedAt: new Date().toISOString(),
     verifiedBy: data.verifiedBy || 'Admin',
@@ -357,6 +431,9 @@ export async function logOfflinePayment(data: {
         utr_number: paymentRecord.utrNumber,
         method: paymentRecord.method,
         status: paymentRecord.status,
+        contribution_type: paymentRecord.contributionType,
+        purpose: paymentRecord.purpose,
+        contributor_phone: paymentRecord.contributorPhone,
         paid_at: paymentRecord.paidAt,
         verified_at: paymentRecord.verifiedAt,
         verified_by: paymentRecord.verifiedBy,
@@ -559,11 +636,13 @@ export async function updateSettings(updates: Partial<CommitteeSettings>, provid
       if (updates.adminPin !== undefined) updatePayload.admin_pin = updates.adminPin;
       if (updates.adminName !== undefined) updatePayload.admin_name = updates.adminName;
       if (updates.adminPhone !== undefined) updatePayload.admin_phone = updates.adminPhone;
+      if (updates.customQrUrl !== undefined) updatePayload.custom_qr_url = updates.customQrUrl;
 
       const { error } = await supabase.from('committee_settings').update(updatePayload).eq('id', 'default');
       if (error) {
         delete updatePayload.admin_name;
         delete updatePayload.admin_phone;
+        delete updatePayload.custom_qr_url;
         await supabase.from('committee_settings').update(updatePayload).eq('id', 'default');
       }
 
@@ -608,32 +687,48 @@ export async function getTreasurySummary(): Promise<TreasurySummary> {
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
 
-  const totalCollected = payments
-    .filter(p => p.status === 'VERIFIED')
+  const verifiedPayments = payments.filter(p => p.status === 'VERIFIED');
+  const totalCollected = verifiedPayments.reduce((sum, p) => sum + p.amount, 0);
+
+  const coreCollected = verifiedPayments
+    .filter(p => (p.contributionType || 'CORE_MONTHLY') === 'CORE_MONTHLY')
     .reduce((sum, p) => sum + p.amount, 0);
 
-  const totalExpenses = expenses
-    .reduce((sum, e) => sum + e.amount, 0);
+  const publicCollected = verifiedPayments
+    .filter(p => p.contributionType === 'PUBLIC_SEVA')
+    .reduce((sum, p) => sum + p.amount, 0);
 
+  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
   const netBalance = totalCollected - totalExpenses;
-  const activeMembers = members.filter(m => m.status === 'ACTIVE');
+
+  const coreMembers = members.filter(m => m.status === 'ACTIVE' && m.memberType !== 'VOLUNTARY');
+  const publicContributorsCount = new Set(
+    verifiedPayments.filter(p => p.contributionType === 'PUBLIC_SEVA').map(p => p.memberName.toLowerCase().trim())
+  ).size;
 
   const currentMonthPayments = payments.filter(
-    p => p.month === currentMonth && p.year === currentYear && p.status === 'VERIFIED'
+    p => p.month === currentMonth && 
+         p.year === currentYear && 
+         p.status === 'VERIFIED' &&
+         (p.contributionType || 'CORE_MONTHLY') === 'CORE_MONTHLY'
   );
   const currentMonthCollections = currentMonthPayments.reduce((sum, p) => sum + p.amount, 0);
-  const currentMonthTarget = activeMembers.length * settings.monthlyAmount;
+  const currentMonthTarget = coreMembers.length * settings.monthlyAmount;
 
   const paidMemberIds = new Set(currentMonthPayments.map(p => p.memberId));
-  const currentMonthPendingCount = activeMembers.filter(m => !paidMemberIds.has(m.id)).length;
+  const currentMonthPendingCount = coreMembers.filter(m => !paidMemberIds.has(m.id)).length;
   const pendingApprovalsCount = payments.filter(p => p.status === 'PENDING_APPROVAL').length;
 
   return {
     totalCollected,
+    coreCollected,
+    publicCollected,
     totalExpenses,
     netBalance,
     totalMembers: members.length,
-    activeMembers: activeMembers.length,
+    activeMembers: members.filter(m => m.status === 'ACTIVE').length,
+    coreMembersCount: coreMembers.length,
+    publicContributorsCount,
     currentMonthCollections,
     currentMonthTarget,
     currentMonthPendingCount,
@@ -645,10 +740,14 @@ export async function getPaymentMatrix(year: number): Promise<MemberMatrixRow[]>
   const settings = await getSettings();
   const members = await getAllMembers();
   const payments = await getAllPayments();
-  const activeMembers = members.filter(m => m.status === 'ACTIVE');
+  const coreMembers = members.filter(m => m.status === 'ACTIVE' && m.memberType !== 'VOLUNTARY');
 
-  return activeMembers.map(member => {
-    const memberPayments = payments.filter(p => p.memberId === member.id && p.year === year);
+  return coreMembers.map(member => {
+    const memberPayments = payments.filter(
+      p => p.memberId === member.id && 
+           p.year === year &&
+           (p.contributionType || 'CORE_MONTHLY') === 'CORE_MONTHLY'
+    );
     
     let totalPaid = 0;
     let totalDue = 0;

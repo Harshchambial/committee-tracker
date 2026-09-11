@@ -11,9 +11,13 @@ import {
   Clock, 
   QrCode, 
   Shield, 
-  FileSpreadsheet 
+  FileSpreadsheet,
+  HeartHandshake,
+  Building2,
+  Sparkles
 } from 'lucide-react';
 import { TreasurySummary, CommitteeSettings } from '@/types';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface TreasuryOverviewProps {
   summary: TreasurySummary | null;
@@ -21,6 +25,7 @@ interface TreasuryOverviewProps {
   onPayClick: () => void;
   onMatrixClick: () => void;
   onExpensesClick: () => void;
+  onJanSahayogClick?: () => void;
 }
 
 export const TreasuryOverview: React.FC<TreasuryOverviewProps> = ({
@@ -28,60 +33,70 @@ export const TreasuryOverview: React.FC<TreasuryOverviewProps> = ({
   settings,
   onPayClick,
   onMatrixClick,
-  onExpensesClick
+  onExpensesClick,
+  onJanSahayogClick
 }) => {
-  const currentMonthName = new Date().toLocaleString('default', { month: 'long' });
-  const currentYear = new Date().getFullYear();
+  const { t, isHindi } = useLanguage();
 
-  const collectionPercent = summary && summary.currentMonthTarget > 0
-    ? Math.round((summary.currentMonthCollections / summary.currentMonthTarget) * 100)
-    : 0;
+  const coreCollected = summary?.coreCollected ?? 0;
+  const publicCollected = summary?.publicCollected ?? 0;
+  const totalCollected = summary?.totalCollected ?? (coreCollected + publicCollected);
 
   return (
     <div className="space-y-4 sm:space-y-6 pb-16 sm:pb-0">
       {/* Top Banner */}
       <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 rounded-2xl sm:rounded-3xl p-5 sm:p-8 text-white shadow-lg relative overflow-hidden">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6">
-          <div className="max-w-xl space-y-1.5 sm:space-y-2">
-            <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-bold border border-emerald-500/30">
-              <Shield className="w-3 h-3" />
-              100% Transparent Community Ledger
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5 sm:gap-6">
+          <div className="max-w-xl space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-bold border border-emerald-500/30">
+              <Shield className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{t('transparencyBadge')}</span>
             </div>
             <h2 className="text-xl sm:text-3xl font-black tracking-tight">
-              {settings?.committeeName || 'Committee Fund'}
+              {settings?.committeeName || (isHindi ? 'विकास सहयोग समिति' : 'Vikas Sahayog Samiti')}
             </h2>
             <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
-              Every member contributes <strong className="text-white font-bold">₹{settings?.monthlyAmount || 1000}/month</strong>. 
-              All bank receipts and expenses are publicly tracked here for complete honesty.
+              {isHindi ? (
+                <>
+                  <strong className="text-white">सार्वजनिक कार्य हेतु जन सहयोग।</strong> कोर सदस्य नियमित <strong className="text-emerald-300">₹{settings?.monthlyAmount || 1000}/माह</strong> देते हैं, तथा कोई भी नागरिक अपनी इच्छानुसार जन कल्याण हेतु सहयोग कर सकता है। पाई-पाई का हिसाब सार्वजनिक है।
+                </>
+              ) : (
+                <>
+                  <strong className="text-white">Public Money for Public Work.</strong> Core members contribute <strong className="text-emerald-300">₹{settings?.monthlyAmount || 1000}/month</strong>, and voluntary contributions are open to everyone for community welfare.
+                </>
+              )}
             </p>
           </div>
 
           {/* Quick Pay CTA buttons */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3">
             <button
               onClick={onPayClick}
-              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-base shadow-md shadow-emerald-500/20 transition cursor-pointer active:scale-95 text-center"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 sm:px-5 sm:py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs sm:text-sm shadow-md shadow-emerald-500/20 transition cursor-pointer active:scale-95 text-center"
             >
               <QrCode className="w-4 h-4" />
-              Pay ₹{settings?.monthlyAmount || 1000} (UPI)
+              <span>{isHindi ? 'सहयोग राशि दें (UPI)' : 'Contribute / Pay (UPI)'}</span>
             </button>
+
             <button
               onClick={onMatrixClick}
-              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs sm:text-base transition cursor-pointer border border-white/15 text-center"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-3 sm:px-4 sm:py-3.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs sm:text-sm transition cursor-pointer border border-white/15 text-center"
             >
-              <FileSpreadsheet className="w-4 h-4" />
-              12-Mo Matrix
+              <FileSpreadsheet className="w-4 h-4 text-emerald-300" />
+              <span>{isHindi ? '12-मासिक सूची' : '12-Mo Matrix'}</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* 2x2 Mobile Grid Stats */}
+      {/* 4-Stat High-Trust Financial Breakdown */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
-        {/* Net Treasury Balance */}
+        {/* 1. Net Available Balance In Hand */}
         <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs flex flex-col justify-between hover:border-emerald-300 transition">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500">In Hand</span>
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500">
+              {t('availableBalance')}
+            </span>
             <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
               <IndianRupee className="w-4 h-4 stroke-[2.5]" />
             </div>
@@ -92,37 +107,68 @@ export const TreasuryOverview: React.FC<TreasuryOverviewProps> = ({
               {(summary?.netBalance ?? 0).toLocaleString('en-IN')}
             </div>
             <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 truncate">
-              Bank / Cash balance
+              {t('bankCashBalance')}
             </p>
           </div>
         </div>
 
-        {/* Total Funds Collected */}
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs flex flex-col justify-between hover:border-blue-300 transition">
+        {/* 2. Core Member Monthly Funds */}
+        <div 
+          onClick={onMatrixClick}
+          className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs flex flex-col justify-between hover:border-blue-300 transition cursor-pointer"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500">Total Collected</span>
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500">
+              {t('coreCollections')}
+            </span>
             <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
-              <ArrowDownLeft className="w-4 h-4 stroke-[2.5]" />
+              <Users className="w-4 h-4 stroke-[2.5]" />
             </div>
           </div>
           <div className="mt-2 sm:mt-4">
             <div className="text-xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center">
               <span className="text-base sm:text-2xl text-blue-600 mr-0.5">₹</span>
-              {(summary?.totalCollected ?? 0).toLocaleString('en-IN')}
+              {coreCollected.toLocaleString('en-IN')}
             </div>
-            <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 truncate">
-              Lifetime contributions
+            <p className="text-[10px] sm:text-xs text-blue-700 font-bold mt-0.5 truncate">
+              {summary?.coreMembersCount ?? 1} {isHindi ? 'कोर सदस्य (₹1k/माह)' : 'Core Members'} →
             </p>
           </div>
         </div>
 
-        {/* Total Expenses / Fund Used */}
+        {/* 3. Jan Sahayog (Voluntary Public Contributions) */}
+        <div 
+          onClick={onJanSahayogClick}
+          className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs flex flex-col justify-between hover:border-orange-300 transition cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500">
+              {t('publicDonations')}
+            </span>
+            <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center">
+              <HeartHandshake className="w-4 h-4 stroke-[2.5]" />
+            </div>
+          </div>
+          <div className="mt-2 sm:mt-4">
+            <div className="text-xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center">
+              <span className="text-base sm:text-2xl text-orange-600 mr-0.5">₹</span>
+              {publicCollected.toLocaleString('en-IN')}
+            </div>
+            <p className="text-[10px] sm:text-xs text-orange-700 font-bold mt-0.5 truncate">
+              {isHindi ? 'स्वैच्छिक जन सहयोग देखें →' : 'View public donations →'}
+            </p>
+          </div>
+        </div>
+
+        {/* 4. Total Public Works Spent */}
         <div 
           onClick={onExpensesClick}
           className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs flex flex-col justify-between hover:border-amber-300 transition cursor-pointer"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500">Total Spent</span>
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500">
+              {t('totalSpent')}
+            </span>
             <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
               <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
             </div>
@@ -133,66 +179,9 @@ export const TreasuryOverview: React.FC<TreasuryOverviewProps> = ({
               {(summary?.totalExpenses ?? 0).toLocaleString('en-IN')}
             </div>
             <p className="text-[10px] sm:text-xs text-amber-700 font-bold mt-0.5 truncate">
-              View expenses →
+              {t('viewExpenses')}
             </p>
           </div>
-        </div>
-
-        {/* Total Committee Members */}
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs flex flex-col justify-between hover:border-purple-300 transition">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500">Members</span>
-            <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center">
-              <Users className="w-4 h-4 stroke-[2.5]" />
-            </div>
-          </div>
-          <div className="mt-2 sm:mt-4">
-            <div className="text-xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              {summary?.activeMembers ?? 0}
-              <span className="text-xs font-normal text-slate-500 ml-1">Active</span>
-            </div>
-            <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 truncate">
-              ₹{settings?.monthlyAmount || 1000}/mo each
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Current Month Progress */}
-      <div className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-          <div>
-            <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-1.5">
-              <TrendingUp className="w-4 h-4 text-emerald-600" />
-              {currentMonthName} {currentYear} Progress
-            </h3>
-            <p className="text-[11px] text-slate-500">
-              Target: ₹{(summary?.currentMonthTarget ?? 0).toLocaleString('en-IN')} ({summary?.activeMembers} × ₹{settings?.monthlyAmount || 1000})
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-              ₹{(summary?.currentMonthCollections ?? 0).toLocaleString('en-IN')} Received
-            </span>
-            {summary && summary.currentMonthPendingCount > 0 && (
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
-                {summary.currentMonthPendingCount} Due
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Progress bar */}
-        <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden p-0.5 border border-slate-200">
-          <div 
-            className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full rounded-full transition-all duration-500"
-            style={{ width: `${Math.min(collectionPercent, 100)}%` }}
-          />
-        </div>
-        <div className="flex justify-between items-center text-[11px] text-slate-500 mt-1.5 font-bold">
-          <span>{collectionPercent}% Collected</span>
-          <span>Pending: ₹{((summary?.currentMonthTarget ?? 0) - (summary?.currentMonthCollections ?? 0)).toLocaleString('en-IN')}</span>
         </div>
       </div>
     </div>

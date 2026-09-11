@@ -32,6 +32,7 @@ export async function POST(request: Request) {
       joinedYear: joinedYear || now.getFullYear(),
       status: 'ACTIVE',
       role: role || 'MEMBER',
+      memberType: body.memberType || 'CORE',
       notes: notes?.trim()
     });
 
