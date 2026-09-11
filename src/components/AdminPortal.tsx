@@ -23,7 +23,8 @@ import {
   Clock,
   HeartHandshake,
   Sparkles,
-  UserCheck
+  UserCheck,
+  RefreshCw
 } from 'lucide-react';
 import { EditMemberModal } from '@/components/EditMemberModal';
 import { AddPaidMemberModal } from '@/components/AddPaidMemberModal';
@@ -83,6 +84,34 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
   // Active Admin Sub-tab
   const [adminTab, setAdminTab] = useState<'APPROVALS' | 'OFFLINE_PAY' | 'REMINDERS' | 'EXPENSE' | 'MEMBERS' | 'SETTINGS'>('APPROVALS');
+
+  // Database Health State
+  const [dbHealth, setDbHealth] = useState<{
+    loading: boolean;
+    rlsBlocked: boolean;
+    isOperational: boolean;
+    sqlFix?: string;
+  }>({ loading: true, rlsBlocked: false, isOperational: true });
+
+  const checkDbHealth = async () => {
+    try {
+      setDbHealth(prev => ({ ...prev, loading: true }));
+      const res = await fetch('/api/diagnostics');
+      const data = await res.json();
+      setDbHealth({
+        loading: false,
+        rlsBlocked: Boolean(data.rlsBlocked),
+        isOperational: Boolean(data.isOperational),
+        sqlFix: data.sqlFix
+      });
+    } catch (e) {
+      setDbHealth(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  React.useEffect(() => {
+    checkDbHealth();
+  }, []);
 
   // Forms state
   const [actionLoading, setActionLoading] = useState(false);
@@ -555,6 +584,54 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Supabase Database RLS Status Banner */}
+      {dbHealth.rlsBlocked && (
+        <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-100/80 border-2 border-amber-400/90 rounded-2xl p-4 sm:p-5 text-amber-950 shadow-md">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-200/80 text-amber-900 text-[11px] font-black uppercase tracking-wider">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-800" />
+                <span>{isHindi ? 'कार्रवाई आवश्यक: Supabase डेटाबेस लॉक है (RLS)' : 'Action Required: Supabase Database Locked (RLS)'}</span>
+              </div>
+              <h4 className="text-sm sm:text-base font-extrabold text-slate-900">
+                {isHindi 
+                  ? 'नए सदस्य व भुगतान सहेजने के लिए Supabase में RLS अक्षम करें' 
+                  : 'Disable Row Level Security in Supabase to save members and payments permanently'}
+              </h4>
+              <p className="text-xs text-slate-700 leading-relaxed max-w-2xl">
+                {isHindi 
+                  ? 'Supabase में Row Level Security (RLS) सक्रिय होने के कारण सदस्य व भुगतान डेटाबेस में सेव नहीं हो रहे हैं। नीचे दिए गए बटन पर क्लिक करके 1-क्लिक SQL कॉपी करें, अपने Supabase -> SQL Editor में पेस्ट करके RUN दबाएं।' 
+                  : 'Supabase RLS is currently blocking write access. Click below to copy the 1-click SQL fix, paste into your Supabase SQL Editor, and click RUN.'}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  if (dbHealth.sqlFix) {
+                    navigator.clipboard.writeText(dbHealth.sqlFix);
+                    alert(isHindi ? 'SQL कोड क्लिपबोर्ड पर कॉपी हो गया! अब Supabase -> SQL Editor में पेस्ट करके RUN दबाएं।' : 'SQL fix copied to clipboard! Now paste in Supabase SQL Editor and click RUN.');
+                  }
+                }}
+                className="px-4 py-2.5 rounded-xl bg-amber-800 hover:bg-amber-900 text-white font-bold text-xs shadow-md shadow-amber-800/20 transition cursor-pointer active:scale-95 flex items-center gap-1.5"
+              >
+                <span>📋 {isHindi ? 'SQL कॉपी करें' : 'Copy 1-Click SQL'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={checkDbHealth}
+                className="px-3 py-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-bold text-xs transition cursor-pointer active:scale-95 flex items-center gap-1"
+                title={isHindi ? 'पुनः जांचें' : 'Re-check status'}
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${dbHealth.loading ? 'animate-spin' : ''}`} />
+                <span>{isHindi ? 'जांचें' : 'Re-check'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Sub-Navigation Tabs */}
       <div className="flex items-center gap-1 overflow-x-auto no-scrollbar bg-slate-100 p-1.5 rounded-2xl border border-slate-200 text-xs font-bold">
@@ -1552,6 +1629,66 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               <UserCheck className="w-4 h-4" />
               <span>{isHindi ? 'पासबुक व रसीदें खोलें →' : 'Open Passbook & Receipts →'}</span>
             </button>
+          </div>
+
+          {/* Supabase Cloud Database Status Card */}
+          <div className="lg:col-span-2 bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                  dbHealth.isOperational ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                }`}>
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+                    <span>{isHindi ? 'Supabase क्लाउड डेटाबेस स्थिति' : 'Supabase Cloud Database Connection'}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                      dbHealth.isOperational ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                    }`}>
+                      {dbHealth.isOperational 
+                        ? (isHindi ? 'सक्रिय (100% OK)' : 'Operational') 
+                        : (isHindi ? 'RLS लॉक है' : 'RLS Locked')}
+                    </span>
+                  </h4>
+                  <p className="text-xs text-slate-500">
+                    {dbHealth.isOperational 
+                      ? (isHindi ? 'क्लाउड डेटाबेस पूर्ण रूप से सक्रिय है। सदस्य और भुगतान तुरंत सेव हो रहे हैं।' : 'Cloud database is fully operational. All additions and edits persist permanently.') 
+                      : (isHindi ? 'Supabase RLS राइट अनुमतियों को ब्लॉक कर रहा है। नीचे दिया गया SQL चलाएं।' : 'Row Level Security is blocking writes. Run the SQL snippet below in Supabase.')}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={checkDbHealth}
+                  className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${dbHealth.loading ? 'animate-spin' : ''}`} />
+                  <span>{isHindi ? 'स्थिति जांचें' : 'Test Connection'}</span>
+                </button>
+              </div>
+            </div>
+
+            {dbHealth.rlsBlocked && dbHealth.sqlFix && (
+              <div className="bg-slate-900 rounded-xl p-4 text-white font-mono text-xs overflow-x-auto">
+                <div className="flex items-center justify-between mb-2 pb-2 border-b border-slate-800 text-slate-400 font-sans">
+                  <span className="font-bold text-amber-400">1. Copy this SQL $\rightarrow$ 2. Paste in Supabase SQL Editor $\rightarrow$ 3. Click Run:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(dbHealth.sqlFix!);
+                      alert(isHindi ? 'SQL कोड कॉपी हो गया! अब Supabase SQL Editor में पेस्ट करके RUN दबाएं।' : 'SQL fix copied to clipboard!');
+                    }}
+                    className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer"
+                  >
+                    📋 Copy SQL
+                  </button>
+                </div>
+                <pre className="text-emerald-300 whitespace-pre-wrap">{dbHealth.sqlFix}</pre>
+              </div>
+            )}
           </div>
 
           {/* Danger Zone: Wipe Test Data */}

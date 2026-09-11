@@ -101,19 +101,52 @@ export async function getAllMembers(): Promise<Member[]> {
   if (isSupabaseConfigured && supabase) {
     try {
       const { data, error } = await supabase.from('members').select('*').order('name', { ascending: true });
-      if (!error && Array.isArray(data) && data.length > 0) {
-        return data.map(m => ({
-          id: m.id,
-          name: m.name,
-          phone: m.phone,
-          email: m.email || undefined,
-          joinedMonth: m.joined_month || 1,
-          joinedYear: m.joined_year || 2026,
-          status: m.status || 'ACTIVE',
-          role: m.role || 'MEMBER',
-          memberType: (m.member_type as 'CORE' | 'VOLUNTARY') || 'CORE',
-          notes: m.notes || undefined
-        }));
+      if (!error && Array.isArray(data)) {
+        if (data.length > 0) {
+          return data.map(m => ({
+            id: m.id,
+            name: m.name,
+            phone: m.phone,
+            email: m.email || undefined,
+            joinedMonth: m.joined_month || 1,
+            joinedYear: m.joined_year || 2026,
+            status: m.status || 'ACTIVE',
+            role: m.role || 'MEMBER',
+            memberType: (m.member_type as 'CORE' | 'VOLUNTARY') || 'CORE',
+            notes: m.notes || undefined
+          }));
+        } else {
+          // Supabase connected but 0 members - seed the admin organizer
+          try {
+            const adminSeed = {
+              id: 'mem_1',
+              name: 'Narinder Singh',
+              phone: '9876543210',
+              joined_month: 1,
+              joined_year: 2026,
+              status: 'ACTIVE',
+              role: 'ADMIN',
+              notes: 'Committee President / Organizer'
+            };
+            const seedRes = await supabase.from('members').insert(adminSeed).select();
+            if (!seedRes.error && seedRes.data && seedRes.data.length > 0) {
+              return seedRes.data.map(m => ({
+                id: m.id,
+                name: m.name,
+                phone: m.phone,
+                email: m.email || undefined,
+                joinedMonth: m.joined_month || 1,
+                joinedYear: m.joined_year || 2026,
+                status: m.status || 'ACTIVE',
+                role: m.role || 'MEMBER',
+                memberType: (m.member_type as 'CORE' | 'VOLUNTARY') || 'CORE',
+                notes: m.notes || undefined
+              }));
+            }
+          } catch (seedErr) {
+            console.warn('Could not seed admin member in Supabase:', seedErr);
+          }
+        }
       }
     } catch (e) {
       console.error('Supabase get members failed, falling back:', e);
@@ -135,31 +168,34 @@ export async function addMember(memberData: Omit<Member, 'id'>): Promise<Member>
   };
 
   if (isSupabaseConfigured && supabase) {
-    try {
-      const insertData: any = {
-        id: newMember.id,
-        name: newMember.name,
-        phone: newMember.phone,
-        email: newMember.email || null,
-        joined_month: newMember.joinedMonth || 1,
-        joined_year: newMember.joinedYear || 2026,
-        status: newMember.status || 'ACTIVE',
-        role: newMember.role || 'MEMBER',
-        member_type: newMember.memberType || 'CORE',
-        notes: newMember.notes || null
-      };
+    const insertData: any = {
+      id: newMember.id,
+      name: newMember.name,
+      phone: newMember.phone,
+      email: newMember.email || null,
+      joined_month: newMember.joinedMonth || 1,
+      joined_year: newMember.joinedYear || 2026,
+      status: newMember.status || 'ACTIVE',
+      role: newMember.role || 'MEMBER',
+      member_type: newMember.memberType || 'CORE',
+      notes: newMember.notes || null
+    };
 
-      const { error } = await supabase.from('members').insert(insertData);
-      if (error) {
-        console.warn('Supabase add member failed with member_type, retrying without it:', error.message);
-        delete insertData.member_type;
-        const retryRes = await supabase.from('members').insert(insertData);
-        if (retryRes.error) {
-          console.error('Supabase add member retry error:', retryRes.error.message);
-        }
+    const { error } = await supabase.from('members').insert(insertData);
+    if (error) {
+      if (error.code === '42501' || error.message?.includes('row-level security')) {
+        throw new Error('Supabase RLS Error: Row Level Security is blocking member creation. Please run the SQL fix in Supabase SQL Editor.');
       }
-    } catch (e) {
-      console.error('Supabase add member failed:', e);
+      console.warn('Supabase add member failed with member_type, retrying without it:', error.message);
+      delete insertData.member_type;
+      const retryRes = await supabase.from('members').insert(insertData);
+      if (retryRes.error) {
+        console.error('Supabase add member retry error:', retryRes.error.message);
+        if (retryRes.error.code === '42501' || retryRes.error.message?.includes('row-level security')) {
+          throw new Error('Supabase RLS Error: Row Level Security is blocking member creation. Please run the SQL fix in Supabase SQL Editor.');
+        }
+        throw new Error(`Database error adding member: ${retryRes.error.message}`);
+      }
     }
   }
 
@@ -176,21 +212,25 @@ export async function addMember(memberData: Omit<Member, 'id'>): Promise<Member>
 
 export async function updateMember(id: string, updates: Partial<Member>): Promise<Member> {
   if (isSupabaseConfigured && supabase) {
-    try {
-      const updatePayload: any = {};
-      if (updates.name !== undefined) updatePayload.name = updates.name;
-      if (updates.phone !== undefined) updatePayload.phone = updates.phone;
-      if (updates.status !== undefined) updatePayload.status = updates.status;
-      if (updates.role !== undefined) updatePayload.role = updates.role;
-      if (updates.memberType !== undefined) updatePayload.member_type = updates.memberType;
-      if (updates.notes !== undefined) updatePayload.notes = updates.notes;
-      const { error } = await supabase.from('members').update(updatePayload).eq('id', id);
-      if (error && error.message?.includes('member_type')) {
-        delete updatePayload.member_type;
-        await supabase.from('members').update(updatePayload).eq('id', id);
+    const updatePayload: any = {};
+    if (updates.name !== undefined) updatePayload.name = updates.name;
+    if (updates.phone !== undefined) updatePayload.phone = updates.phone;
+    if (updates.status !== undefined) updatePayload.status = updates.status;
+    if (updates.role !== undefined) updatePayload.role = updates.role;
+    if (updates.memberType !== undefined) updatePayload.member_type = updates.memberType;
+    if (updates.notes !== undefined) updatePayload.notes = updates.notes;
+    const { error } = await supabase.from('members').update(updatePayload).eq('id', id);
+    if (error) {
+      if (error.code === '42501' || error.message?.includes('row-level security')) {
+        throw new Error('Supabase RLS Error: Row Level Security is blocking member updates. Please run the SQL fix in Supabase SQL Editor.');
       }
-    } catch (e) {
-      console.error('Supabase update member failed:', e);
+      if (error.message?.includes('member_type')) {
+        delete updatePayload.member_type;
+        const retryRes = await supabase.from('members').update(updatePayload).eq('id', id);
+        if (retryRes.error) throw new Error(`Database error updating member: ${retryRes.error.message}`);
+      } else {
+        throw new Error(`Database error updating member: ${error.message}`);
+      }
     }
   }
 
@@ -219,11 +259,13 @@ export async function updateMember(id: string, updates: Partial<Member>): Promis
 
 export async function deleteMember(id: string): Promise<void> {
   if (isSupabaseConfigured && supabase) {
-    try {
-      await supabase.from('payments').delete().eq('member_id', id);
-      await supabase.from('members').delete().eq('id', id);
-    } catch (e) {
-      console.error('Supabase delete member failed:', e);
+    await supabase.from('payments').delete().eq('member_id', id);
+    const { error } = await supabase.from('members').delete().eq('id', id);
+    if (error) {
+      if (error.code === '42501' || error.message?.includes('row-level security')) {
+        throw new Error('Supabase RLS Error: Row Level Security is blocking member deletion. Please run the SQL fix in Supabase SQL Editor.');
+      }
+      throw new Error(`Database error deleting member: ${error.message}`);
     }
   }
 
@@ -238,7 +280,7 @@ export async function getAllPayments(): Promise<PaymentRecord[]> {
   if (isSupabaseConfigured && supabase) {
     try {
       const { data, error } = await supabase.from('payments').select('*').order('paid_at', { ascending: false });
-      if (!error && data && data.length > 0) {
+      if (!error && Array.isArray(data)) {
         return data.map(p => ({
           id: p.id,
           memberId: p.member_id,
@@ -378,6 +420,9 @@ export async function submitPayment(data: {
 
       const { error } = await supabase.from('payments').insert(paymentInsert);
       if (error) {
+        if (error.code === '42501' || error.message?.includes('row-level security')) {
+          throw new Error('Supabase RLS Error: Row Level Security is blocking payment submission. Please run the SQL fix in Supabase SQL Editor.');
+        }
         console.warn('Supabase submit payment error, retrying without extended columns:', error.message);
         delete paymentInsert.contribution_type;
         delete paymentInsert.purpose;
@@ -389,11 +434,18 @@ export async function submitPayment(data: {
         if (retryRes.error) {
           console.warn('Supabase submit payment retry failed, retrying with member_id=null:', retryRes.error.message);
           paymentInsert.member_id = null;
-          await supabase.from('payments').insert(paymentInsert);
+          const finalRetry = await supabase.from('payments').insert(paymentInsert);
+          if (finalRetry.error) {
+            if (finalRetry.error.code === '42501' || finalRetry.error.message?.includes('row-level security')) {
+              throw new Error('Supabase RLS Error: Row Level Security is blocking payment submission. Please run the SQL fix in Supabase SQL Editor.');
+            }
+            throw new Error(`Database error saving payment: ${finalRetry.error.message}`);
+          }
         }
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Supabase submit payment error:', e);
+      throw e;
     }
   }
 
@@ -508,6 +560,9 @@ export async function logOfflinePayment(data: {
 
       const { error } = await supabase.from('payments').insert(paymentInsert);
       if (error) {
+        if (error.code === '42501' || error.message?.includes('row-level security')) {
+          throw new Error('Supabase RLS Error: Row Level Security is blocking payment records. Please run the SQL fix in Supabase SQL Editor.');
+        }
         console.warn('Supabase log offline payment error, retrying without extended columns:', error.message);
         delete paymentInsert.contribution_type;
         delete paymentInsert.purpose;
@@ -519,11 +574,18 @@ export async function logOfflinePayment(data: {
         if (retryRes.error) {
           console.warn('Supabase payment insert retry failed, retrying with member_id=null:', retryRes.error.message);
           paymentInsert.member_id = null;
-          await supabase.from('payments').insert(paymentInsert);
+          const finalRetry = await supabase.from('payments').insert(paymentInsert);
+          if (finalRetry.error) {
+            if (finalRetry.error.code === '42501' || finalRetry.error.message?.includes('row-level security')) {
+              throw new Error('Supabase RLS Error: Row Level Security is blocking payment records. Please run the SQL fix in Supabase SQL Editor.');
+            }
+            throw new Error(`Database error saving payment: ${finalRetry.error.message}`);
+          }
         }
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Supabase log offline payment exception:', e);
+      throw e;
     }
   }
 
@@ -543,21 +605,15 @@ export async function verifyPayment(
   const reason = rejectionReason || 'Payment could not be verified in bank statement.';
 
   if (isSupabaseConfigured && supabase) {
-    try {
-      if (action === 'APPROVE') {
-        await supabase.from('payments').update({
-          status: 'VERIFIED',
-          verified_at: verifiedAt,
-          verified_by: verifiedBy
-        }).eq('id', paymentId);
-      } else {
-        await supabase.from('payments').update({
-          status: 'REJECTED',
-          rejection_reason: reason
-        }).eq('id', paymentId);
+    const updatePayload = action === 'APPROVE' 
+      ? { status: 'VERIFIED', verified_at: verifiedAt, verified_by: verifiedBy }
+      : { status: 'REJECTED', rejection_reason: reason };
+    const { error } = await supabase.from('payments').update(updatePayload).eq('id', paymentId);
+    if (error) {
+      if (error.code === '42501' || error.message?.includes('row-level security')) {
+        throw new Error('Supabase RLS Error: Row Level Security is blocking payment verification. Please run the SQL fix in Supabase SQL Editor.');
       }
-    } catch (e) {
-      console.error('Supabase verify payment error:', e);
+      throw new Error(`Database error verifying payment: ${error.message}`);
     }
   }
 
@@ -583,7 +639,7 @@ export async function getAllExpenses(): Promise<ExpenseRecord[]> {
   if (isSupabaseConfigured && supabase) {
     try {
       const { data, error } = await supabase.from('expenses').select('*').order('date', { ascending: false });
-      if (!error && data && data.length > 0) {
+      if (!error && Array.isArray(data)) {
         return data.map(e => ({
           id: e.id,
           title: e.title,
@@ -610,19 +666,21 @@ export async function addExpense(expenseData: Omit<ExpenseRecord, 'id'>): Promis
   };
 
   if (isSupabaseConfigured && supabase) {
-    try {
-      await supabase.from('expenses').insert({
-        id: newExpense.id,
-        title: newExpense.title,
-        category: newExpense.category,
-        amount: newExpense.amount,
-        date: newExpense.date,
-        description: newExpense.description,
-        recorded_by: newExpense.recordedBy,
-        receipt_note: newExpense.receiptNote
-      });
-    } catch (e) {
-      console.error('Supabase add expense error:', e);
+    const { error } = await supabase.from('expenses').insert({
+      id: newExpense.id,
+      title: newExpense.title,
+      category: newExpense.category,
+      amount: newExpense.amount,
+      date: newExpense.date,
+      description: newExpense.description,
+      recorded_by: newExpense.recordedBy,
+      receipt_note: newExpense.receiptNote
+    });
+    if (error) {
+      if (error.code === '42501' || error.message?.includes('row-level security')) {
+        throw new Error('Supabase RLS Error: Row Level Security is blocking expense records. Please run the SQL fix in Supabase SQL Editor.');
+      }
+      throw new Error(`Database error adding expense: ${error.message}`);
     }
   }
 
@@ -634,10 +692,12 @@ export async function addExpense(expenseData: Omit<ExpenseRecord, 'id'>): Promis
 
 export async function deleteExpense(id: string): Promise<void> {
   if (isSupabaseConfigured && supabase) {
-    try {
-      await supabase.from('expenses').delete().eq('id', id);
-    } catch (e) {
-      console.error('Supabase delete expense error:', e);
+    const { error } = await supabase.from('expenses').delete().eq('id', id);
+    if (error) {
+      if (error.code === '42501' || error.message?.includes('row-level security')) {
+        throw new Error('Supabase RLS Error: Row Level Security is blocking expense deletion. Please run the SQL fix in Supabase SQL Editor.');
+      }
+      throw new Error(`Database error deleting expense: ${error.message}`);
     }
   }
 
@@ -657,16 +717,9 @@ export async function getSettings(): Promise<CommitteeSettings> {
 
         if (!adminName) {
           try {
-            const { data: adminMember } = await supabase
-              .from('members')
-              .select('name, phone')
-              .eq('role', 'ADMIN')
-              .limit(1)
-              .maybeSingle();
-            if (adminMember) {
-              adminName = adminMember.name;
-              if (!adminPhone) adminPhone = adminMember.phone;
-            }
+            const { data: adminMem } = await supabase.from('members').select('name, phone').eq('role', 'ADMIN').limit(1).single();
+            if (adminMem?.name) adminName = adminMem.name;
+            if (adminMem?.phone) adminPhone = adminMem.phone;
           } catch (mErr) {
             // ignore member fetch error
           }
@@ -709,34 +762,36 @@ export async function updateSettings(updates: Partial<CommitteeSettings>, provid
   }
 
   if (isSupabaseConfigured && supabase) {
-    try {
-      const updatePayload: any = {};
-      if (updates.committeeName !== undefined) updatePayload.committee_name = updates.committeeName;
-      if (updates.tagline !== undefined) updatePayload.tagline = updates.tagline;
-      if (updates.monthlyAmount !== undefined) updatePayload.monthly_amount = updates.monthlyAmount;
-      if (updates.upiId !== undefined) updatePayload.upi_id = updates.upiId;
-      if (updates.payeeName !== undefined) updatePayload.payee_name = updates.payeeName;
-      if (updates.adminPin !== undefined) updatePayload.admin_pin = updates.adminPin;
-      if (updates.adminName !== undefined) updatePayload.admin_name = updates.adminName;
-      if (updates.adminPhone !== undefined) updatePayload.admin_phone = updates.adminPhone;
-      if (updates.customQrUrl !== undefined) updatePayload.custom_qr_url = updates.customQrUrl;
+    const updatePayload: any = {};
+    if (updates.committeeName !== undefined) updatePayload.committee_name = updates.committeeName;
+    if (updates.tagline !== undefined) updatePayload.tagline = updates.tagline;
+    if (updates.monthlyAmount !== undefined) updatePayload.monthly_amount = updates.monthlyAmount;
+    if (updates.upiId !== undefined) updatePayload.upi_id = updates.upiId;
+    if (updates.payeeName !== undefined) updatePayload.payee_name = updates.payeeName;
+    if (updates.adminPin !== undefined) updatePayload.admin_pin = updates.adminPin;
+    if (updates.adminName !== undefined) updatePayload.admin_name = updates.adminName;
+    if (updates.adminPhone !== undefined) updatePayload.admin_phone = updates.adminPhone;
+    if (updates.customQrUrl !== undefined) updatePayload.custom_qr_url = updates.customQrUrl;
 
-      const { error } = await supabase.from('committee_settings').update(updatePayload).eq('id', 'default');
-      if (error) {
-        delete updatePayload.admin_name;
-        delete updatePayload.admin_phone;
-        delete updatePayload.custom_qr_url;
-        await supabase.from('committee_settings').update(updatePayload).eq('id', 'default');
+    const { error } = await supabase.from('committee_settings').upsert({ id: 'default', ...updatePayload });
+    if (error) {
+      if (error.code === '42501' || error.message?.includes('row-level security')) {
+        throw new Error('Supabase RLS Error: Row Level Security is blocking settings updates. Please run the SQL fix in Supabase SQL Editor.');
       }
+      delete updatePayload.admin_name;
+      delete updatePayload.admin_phone;
+      delete updatePayload.custom_qr_url;
+      const retry = await supabase.from('committee_settings').upsert({ id: 'default', ...updatePayload });
+      if (retry.error) {
+        throw new Error(`Database error saving settings: ${retry.error.message}`);
+      }
+    }
 
-      if (updates.adminName || updates.adminPhone) {
-        const memberPayload: any = {};
-        if (updates.adminName) memberPayload.name = updates.adminName;
-        if (updates.adminPhone) memberPayload.phone = updates.adminPhone;
-        await supabase.from('members').update(memberPayload).eq('role', 'ADMIN');
-      }
-    } catch (e) {
-      console.error('Supabase update settings error:', e);
+    if (updates.adminName || updates.adminPhone) {
+      const memberPayload: any = {};
+      if (updates.adminName) memberPayload.name = updates.adminName;
+      if (updates.adminPhone) memberPayload.phone = updates.adminPhone;
+      await supabase.from('members').update(memberPayload).eq('role', 'ADMIN');
     }
   }
 
