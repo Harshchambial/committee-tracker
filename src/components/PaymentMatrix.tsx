@@ -267,10 +267,20 @@ export const PaymentMatrix: React.FC<PaymentMatrixProps> = ({
                       <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                         <span>{getMonthShort(currentMonth)} {year}:</span>
                         {isCurrentPaid && (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md font-extrabold">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            {isHindi ? 'जमा ₹1,000' : 'Paid ₹1,000'}
-                          </span>
+                          <div className="inline-flex items-center gap-1.5 flex-wrap">
+                            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md font-extrabold">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              {isHindi ? 'जमा ₹1,000' : 'Paid ₹1,000'}
+                            </span>
+                            {currentMonthData.payment?.paidAt && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-900 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 shadow-2xs">
+                                📅 {new Date(currentMonthData.payment.paidAt).toLocaleDateString(isHindi ? 'hi-IN' : 'en-IN', {
+                                  day: 'numeric',
+                                  month: 'short'
+                                })}
+                              </span>
+                            )}
+                          </div>
                         )}
                         {isCurrentPending && (
                           <span className="inline-flex items-center gap-1 text-[11px] text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md font-bold">
@@ -353,10 +363,20 @@ export const PaymentMatrix: React.FC<PaymentMatrixProps> = ({
                                 {status === 'PAID' ? (
                                   <button
                                     onClick={() => mData.payment && onSelectPaymentForReceipt(mData.payment)}
-                                    className="hover:underline flex items-center justify-center gap-0.5 w-full"
+                                    className="hover:underline flex flex-col items-center justify-center gap-0.5 w-full py-0.5"
                                   >
-                                    <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
-                                    <span>₹1k</span>
+                                    <div className="flex items-center justify-center gap-0.5 w-full">
+                                      <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                                      <span>₹1k</span>
+                                    </div>
+                                    {mData.payment?.paidAt && (
+                                      <span className="text-[8px] font-mono text-emerald-700/90 font-bold leading-none">
+                                        {new Date(mData.payment.paidAt).toLocaleDateString(isHindi ? 'hi-IN' : 'en-IN', {
+                                          day: 'numeric',
+                                          month: 'short'
+                                        })}
+                                      </span>
+                                    )}
                                   </button>
                                 ) : status === 'PENDING_APPROVAL' ? (
                                   <span>{isHindi ? 'जांच' : 'Rev'}</span>
@@ -436,9 +456,20 @@ export const PaymentMatrix: React.FC<PaymentMatrixProps> = ({
                           {status === 'PAID' && (
                             <button
                               onClick={() => monthData.payment && onSelectPaymentForReceipt(monthData.payment)}
-                              className="w-full py-1 rounded-md bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold text-[10px] transition cursor-pointer"
+                              className="w-full py-1 px-0.5 rounded-md bg-emerald-100 hover:bg-emerald-200 text-emerald-900 font-bold text-[10px] transition cursor-pointer flex flex-col items-center justify-center leading-tight"
                             >
-                              ₹1k
+                              <span className="flex items-center justify-center gap-0.5">
+                                <CheckCircle2 className="w-2.5 h-2.5 text-emerald-700" />
+                                <span>₹1k</span>
+                              </span>
+                              {monthData.payment?.paidAt && (
+                                <span className="text-[8px] font-mono text-emerald-800 font-semibold">
+                                  {new Date(monthData.payment.paidAt).toLocaleDateString(isHindi ? 'hi-IN' : 'en-IN', {
+                                    day: 'numeric',
+                                    month: 'short'
+                                  })}
+                                </span>
+                              )}
                             </button>
                           )}
                           {status === 'PENDING_APPROVAL' && (

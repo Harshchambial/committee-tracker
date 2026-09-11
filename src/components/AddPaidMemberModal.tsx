@@ -282,7 +282,7 @@ export const AddPaidMemberModal: React.FC<AddPaidMemberModalProps> = ({
                 <input
                   ref={nameInputRef}
                   type="text"
-                  placeholder={isHindi ? 'जैसे: राजेश शर्मा / कुलदीप सिंह' : 'e.g. Rajesh Sharma / Kuldeep Singh'}
+                  placeholder={isHindi ? 'जैसे: कुलदीप सिंह / नरेश कुमार' : 'e.g. Kuldeep Singh / Naresh Kumar'}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required

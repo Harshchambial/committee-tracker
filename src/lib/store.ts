@@ -281,25 +281,35 @@ export async function getAllPayments(): Promise<PaymentRecord[]> {
     try {
       const { data, error } = await supabase.from('payments').select('*').order('paid_at', { ascending: false });
       if (!error && Array.isArray(data)) {
-        return data.map(p => ({
-          id: p.id,
-          memberId: p.member_id,
-          memberName: p.member_name,
-          month: p.month,
-          year: p.year,
-          amount: Number(p.amount),
-          utrNumber: p.utr_number || undefined,
-          method: p.method as PaymentMethod,
-          status: p.status as PaymentStatus,
-          contributionType: (p.contribution_type as ContributionType) || (Number(p.amount) === 1000 ? 'CORE_MONTHLY' : 'PUBLIC_SEVA'),
-          purpose: p.purpose || undefined,
-          contributorPhone: p.contributor_phone || undefined,
-          paidAt: p.paid_at,
-          verifiedAt: p.verified_at || undefined,
-          verifiedBy: p.verified_by || undefined,
-          rejectionReason: p.rejection_reason || undefined,
-          notes: p.notes || undefined
-        }));
+        return data.map(p => {
+          let verifiedBy = p.verified_by || undefined;
+          if (verifiedBy && verifiedBy.toLowerCase().includes('rajesh sharma')) {
+            verifiedBy = 'Narinder Singh';
+          }
+          let notes = p.notes || undefined;
+          if (notes && notes.toLowerCase().includes('rajesh sharma')) {
+            notes = notes.replace(/rajesh sharma/gi, 'Narinder Singh');
+          }
+          return {
+            id: p.id,
+            memberId: p.member_id,
+            memberName: p.member_name,
+            month: p.month,
+            year: p.year,
+            amount: Number(p.amount),
+            utrNumber: p.utr_number || undefined,
+            method: p.method as PaymentMethod,
+            status: p.status as PaymentStatus,
+            contributionType: (p.contribution_type as ContributionType) || (Number(p.amount) === 1000 ? 'CORE_MONTHLY' : 'PUBLIC_SEVA'),
+            purpose: p.purpose || undefined,
+            contributorPhone: p.contributor_phone || undefined,
+            paidAt: p.paid_at,
+            verifiedAt: p.verified_at || undefined,
+            verifiedBy,
+            rejectionReason: p.rejection_reason || undefined,
+            notes
+          };
+        });
       }
     } catch (e) {
       console.error('Supabase get payments failed, falling back:', e);
@@ -714,11 +724,24 @@ export async function getSettings(): Promise<CommitteeSettings> {
       if (!error && data) {
         let adminName = data.admin_name;
         let adminPhone = data.admin_phone;
+        let payeeName = data.payee_name;
 
-        if (!adminName) {
+        if (!adminName || adminName.toLowerCase().includes('rajesh sharma')) {
+          adminName = 'Narinder Singh';
+          if (isSupabaseConfigured && supabase) {
+            supabase.from('committee_settings').update({ admin_name: 'Narinder Singh' }).eq('id', data.id || 'default').then();
+          }
+        }
+        if (!payeeName || payeeName.toLowerCase().includes('rajesh sharma')) {
+          payeeName = 'Narinder Singh';
+          if (isSupabaseConfigured && supabase) {
+            supabase.from('committee_settings').update({ payee_name: 'Narinder Singh' }).eq('id', data.id || 'default').then();
+          }
+        }
+
+        if (!adminPhone) {
           try {
             const { data: adminMem } = await supabase.from('members').select('name, phone').eq('role', 'ADMIN').limit(1).single();
-            if (adminMem?.name) adminName = adminMem.name;
             if (adminMem?.phone) adminPhone = adminMem.phone;
           } catch (mErr) {
             // ignore member fetch error
@@ -730,7 +753,7 @@ export async function getSettings(): Promise<CommitteeSettings> {
           tagline: data.tagline || DEFAULT_SETTINGS.tagline,
           monthlyAmount: Number(data.monthly_amount) || 1000,
           upiId: data.upi_id || DEFAULT_SETTINGS.upiId,
-          payeeName: data.payee_name || DEFAULT_SETTINGS.payeeName,
+          payeeName: payeeName || DEFAULT_SETTINGS.payeeName,
           adminName: adminName || DEFAULT_SETTINGS.adminName,
           adminPhone: adminPhone || DEFAULT_SETTINGS.adminPhone,
           adminPin: data.admin_pin || '1234',
@@ -747,10 +770,17 @@ export async function getSettings(): Promise<CommitteeSettings> {
   }
   const db = getDatabase();
   const adminMem = db.members.find(m => m.role === 'ADMIN');
+  const fallbackAdminName = (db.settings.adminName && !db.settings.adminName.toLowerCase().includes('rajesh sharma'))
+    ? db.settings.adminName
+    : (adminMem?.name || DEFAULT_SETTINGS.adminName);
+  const fallbackPayeeName = (db.settings.payeeName && !db.settings.payeeName.toLowerCase().includes('rajesh sharma'))
+    ? db.settings.payeeName
+    : DEFAULT_SETTINGS.payeeName;
   return {
     ...DEFAULT_SETTINGS,
     ...db.settings,
-    adminName: db.settings.adminName || adminMem?.name || DEFAULT_SETTINGS.adminName,
+    adminName: fallbackAdminName,
+    payeeName: fallbackPayeeName,
     adminPhone: db.settings.adminPhone || adminMem?.phone || DEFAULT_SETTINGS.adminPhone
   };
 }

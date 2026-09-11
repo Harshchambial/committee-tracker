@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
 import { 
@@ -85,15 +85,21 @@ export const PayDuesModal: React.FC<PayDuesModalProps> = ({
 
   // Filter core members for monthly selector
   const coreMembers = members.filter(m => m.status === 'ACTIVE' && m.memberType !== 'VOLUNTARY');
+  const prevIsOpenRef = useRef(false);
 
   useEffect(() => {
-    if (isOpen) {
-      if (initialType) setContributionType(initialType);
+    if (isOpen && !prevIsOpenRef.current) {
+      const initType = initialType || 'CORE_MONTHLY';
+      setContributionType(initType);
+
       if (initialMemberId) {
         setSelectedMemberId(initialMemberId);
         setContributionType('CORE_MONTHLY');
-      } else if (coreMembers.length > 0 && !selectedMemberId) {
-        setSelectedMemberId(coreMembers[0].id);
+      } else {
+        const firstCore = members.find(m => m.status === 'ACTIVE' && m.memberType !== 'VOLUNTARY');
+        if (firstCore) {
+          setSelectedMemberId(firstCore.id);
+        }
       }
       
       if (initialMonth) setSelectedMonth(initialMonth);
@@ -103,15 +109,19 @@ export const PayDuesModal: React.FC<PayDuesModalProps> = ({
       setSuccessMessage(null);
       setUtrNumber('');
       setNotes('');
-
-      // Add Escape key listener
-      const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') onClose();
-      };
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
     }
-  }, [isOpen, initialMemberId, initialMonth, initialYear, initialType, coreMembers, onClose]);
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen, initialMemberId, initialMonth, initialYear, initialType, members]);
+
+  // Dedicated Escape key listener
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -246,8 +256,15 @@ export const PayDuesModal: React.FC<PayDuesModalProps> = ({
           <div className="grid grid-cols-2 gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
             <button
               type="button"
-              onClick={() => setContributionType('CORE_MONTHLY')}
-              className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl font-bold text-xs transition cursor-pointer ${
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setContributionType('CORE_MONTHLY');
+                if (!selectedMemberId && coreMembers.length > 0) {
+                  setSelectedMemberId(coreMembers[0].id);
+                }
+              }}
+              className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl font-bold text-xs transition cursor-pointer active:scale-95 ${
                 isCore 
                   ? 'bg-white text-emerald-800 shadow-xs border border-slate-200' 
                   : 'text-slate-600 hover:text-slate-900'
@@ -259,8 +276,12 @@ export const PayDuesModal: React.FC<PayDuesModalProps> = ({
 
             <button
               type="button"
-              onClick={() => setContributionType('PUBLIC_SEVA')}
-              className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl font-bold text-xs transition cursor-pointer ${
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setContributionType('PUBLIC_SEVA');
+              }}
+              className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl font-bold text-xs transition cursor-pointer active:scale-95 ${
                 !isCore 
                   ? 'bg-white text-orange-800 shadow-xs border border-slate-200' 
                   : 'text-slate-600 hover:text-slate-900'

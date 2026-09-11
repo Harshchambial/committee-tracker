@@ -41,7 +41,10 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   const isPublic = payment.contributionType === 'PUBLIC_SEVA';
   const monthName = getMonthName(payment.month);
   const committeeName = settings?.committeeName || (isHindi ? 'विकास सहयोग समिति' : 'Vikas Sahayog Samiti');
-  const adminName = settings?.adminName || 'Narinder Singh';
+  const rawAdmin = settings?.adminName || payment.verifiedBy || 'Narinder Singh';
+  const adminName = (rawAdmin && !rawAdmin.toLowerCase().includes('rajesh sharma') && rawAdmin !== 'Admin')
+    ? rawAdmin
+    : 'Narinder Singh';
   const receiptNumber = `REC-${payment.year}-${String(payment.month).padStart(2, '0')}-${payment.id.slice(-5).toUpperCase()}`;
 
   const handlePrint = () => {
