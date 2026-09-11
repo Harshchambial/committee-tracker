@@ -5,7 +5,12 @@ export async function GET() {
   try {
     const settings = await getSettings();
     const { adminPin, ...publicSettings } = settings;
-    return NextResponse.json({ settings: publicSettings });
+    return NextResponse.json({ settings: publicSettings }, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=3, stale-while-revalidate=30',
+        'CDN-Cache-Control': 'public, s-maxage=3, stale-while-revalidate=30'
+      }
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Failed to fetch settings' }, { status: 500 });
   }

@@ -1031,3 +1031,136 @@ export async function resetToFreshStart(providedPin: string): Promise<void> {
   db.expenses = [];
   saveDatabase(db);
 }
+
+export async function getFullCommitteeSync(year: number = new Date().getFullYear()) {
+  const [settings, members, payments, expenses] = await Promise.all([
+    getSettings(),
+    getAllMembers(),
+    getAllPayments(),
+    getAllExpenses()
+  ]);
+
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+
+  const verifiedPayments = payments.filter(p => p.status === 'VERIFIED');
+  const totalCollected = verifiedPayments.reduce((sum, p) => sum + p.amount, 0);
+
+  const coreCollected = verifiedPayments
+    .filter(p => (p.contributionType || 'CORE_MONTHLY') === 'CORE_MONTHLY')
+    .reduce((sum, p) => sum + p.amount, 0);
+
+  const publicCollected = verifiedPayments
+    .filter(p => p.contributionType === 'PUBLIC_SEVA')
+    .reduce((sum, p) => sum + p.amount, 0);
+
+  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const netBalance = totalCollected - totalExpenses;
+
+  const coreMembers = members.filter(m => m.status === 'ACTIVE' && m.memberType !== 'VOLUNTARY');
+  const publicContributorsCount = new Set(
+    verifiedPayments.filter(p => p.contributionType === 'PUBLIC_SEVA').map(p => p.memberName.toLowerCase().trim())
+  ).size;
+
+  const currentMonthPayments = payments.filter(
+    p => p.month === currentMonth && 
+         p.year === currentYear && 
+         p.status === 'VERIFIED' &&
+         (p.contributionType || 'CORE_MONTHLY') === 'CORE_MONTHLY'
+  );
+  const currentMonthCollections = currentMonthPayments.reduce((sum, p) => sum + p.amount, 0);
+  const currentMonthTarget = coreMembers.length * settings.monthlyAmount;
+
+  const paidMemberIds = new Set(currentMonthPayments.map(p => p.memberId));
+  const currentMonthPendingCount = coreMembers.filter(m => !paidMemberIds.has(m.id)).length;
+  const pendingApprovalsCount = payments.filter(p => p.status === 'PENDING_APPROVAL').length;
+
+  const summary: TreasurySummary = {
+    totalCollected,
+    coreCollected,
+    publicCollected,
+    totalExpenses,
+    netBalance,
+    totalMembers: members.length,
+    activeMembers: members.filter(m => m.status === 'ACTIVE').length,
+    coreMembersCount: coreMembers.length,
+    publicContributorsCount,
+    currentMonthCollections,
+    currentMonthTarget,
+    currentMonthPendingCount,
+    pendingApprovalsCount
+  };
+
+  const matrix: MemberMatrixRow[] = coreMembers.map(member => {
+    const memberPayments = payments.filter(
+      p => p.memberId === member.id && 
+           p.year === year &&
+           (p.contributionType || 'CORE_MONTHLY') === 'CORE_MONTHLY'
+    );
+    
+    let totalPaid = 0;
+    let totalDue = 0;
+    const monthsRecord: Record<number, any> = {};
+
+    for (let m = 1; m <= 12; m++) {
+      const monthPayment = memberPayments.find(p => p.month === m);
+      const hasJoined = (member.joinedYear < year) || (member.joinedYear === year && member.joinedMonth <= m);
+
+      if (!hasJoined) {
+        monthsRecord[m] = {
+          month: m,
+          monthName: getMonthName(m),
+          year,
+          status: 'NOT_JOINED',
+          amount: 0
+        };
+      } else if (monthPayment && monthPayment.status === 'VERIFIED') {
+        totalPaid += monthPayment.amount;
+        monthsRecord[m] = {
+          month: m,
+          monthName: getMonthName(m),
+          year,
+          status: 'PAID',
+          payment: monthPayment,
+          amount: monthPayment.amount
+        };
+      } else if (monthPayment && monthPayment.status === 'PENDING_APPROVAL') {
+        monthsRecord[m] = {
+          month: m,
+          monthName: getMonthName(m),
+          year,
+          status: 'PENDING_APPROVAL',
+          payment: monthPayment,
+          amount: monthPayment.amount
+        };
+      } else {
+        totalDue += settings.monthlyAmount;
+        monthsRecord[m] = {
+          month: m,
+          monthName: getMonthName(m),
+          year,
+          status: 'DUE',
+          amount: settings.monthlyAmount
+        };
+      }
+    }
+
+    return {
+      member,
+      totalPaid,
+      totalDue,
+      months: monthsRecord
+    };
+  });
+
+  return {
+    summary,
+    settings,
+    members,
+    payments,
+    matrix,
+    expenses,
+    syncedAt: new Date().toISOString()
+  };
+}

@@ -57,7 +57,7 @@ export default function Home() {
   const [isAdminProfileOpen, setIsAdminProfileOpen] = useState<boolean>(false);
   const [isAddPaidMemberOpen, setIsAddPaidMemberOpen] = useState<boolean>(false);
 
-  // Load saved user session on mount
+  // Load saved user session and offline instant cache on mount
   useEffect(() => {
     try {
       const savedUser = localStorage.getItem('samiti_auth_user');
@@ -67,43 +67,58 @@ export default function Home() {
         setCurrentUser(parsed);
         if (savedPin) setAdminPin(savedPin);
       }
+
+      // Offline-First / Instant UI: populate from previous sync cache in 0.05s
+      const cachedSync = localStorage.getItem('samiti_cached_sync');
+      if (cachedSync) {
+        const parsed = JSON.parse(cachedSync);
+        if (parsed.summary) setSummary(parsed.summary);
+        if (parsed.settings) setSettings(parsed.settings);
+        if (parsed.members) setMembers(parsed.members);
+        if (parsed.payments) setPayments(parsed.payments);
+        if (parsed.matrix) setMatrix(parsed.matrix);
+        if (parsed.expenses) setExpenses(parsed.expenses);
+        setIsLoading(false); // Screen appears immediately without blank screen
+      }
     } catch (e) {
-      console.error('Failed to parse saved session:', e);
+      console.error('Failed to parse saved session/cache:', e);
     } finally {
       setIsAuthChecking(false);
     }
   }, []);
 
-  // Fetch all data
-  const fetchData = useCallback(async () => {
+  // Fetch unified sync data (1 single network call instead of 5 separate ones)
+  const fetchData = useCallback(async (bypassCache = false) => {
     try {
-      setIsLoading(true);
-      const [treasuryRes, membersRes, paymentsRes, matrixRes, expensesRes] = await Promise.all([
-        fetch('/api/treasury'),
-        fetch('/api/members'),
-        fetch('/api/payments'),
-        fetch(`/api/matrix?year=${year}`),
-        fetch('/api/expenses')
-      ]);
+      // Only show full-screen spinner if we have zero cached data
+      setIsLoading(prev => (!summary ? true : false));
 
-      const treasuryData = await treasuryRes.json();
-      const membersData = await membersRes.json();
-      const paymentsData = await paymentsRes.json();
-      const matrixData = await matrixRes.json();
-      const expensesData = await expensesRes.json();
+      const syncUrl = bypassCache 
+        ? `/api/sync?year=${year}&_t=${Date.now()}` 
+        : `/api/sync?year=${year}`;
 
-      setSummary(treasuryData.summary || null);
-      setSettings(treasuryData.settings || null);
-      setMembers(membersData.members || []);
-      setPayments(paymentsData.payments || []);
-      setMatrix(matrixData.matrix || []);
-      setExpenses(expensesData.expenses || []);
+      const res = await fetch(syncUrl);
+      if (res.ok) {
+        const syncData = await res.json();
+        setSummary(syncData.summary || null);
+        setSettings(syncData.settings || null);
+        setMembers(syncData.members || []);
+        setPayments(syncData.payments || []);
+        setMatrix(syncData.matrix || []);
+        setExpenses(syncData.expenses || []);
+
+        try {
+          localStorage.setItem('samiti_cached_sync', JSON.stringify(syncData));
+        } catch (e) {
+          // localStorage quota exception protection
+        }
+      }
     } catch (error) {
-      console.error('Failed to fetch committee data:', error);
+      console.error('Failed to sync committee data:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [year]);
+  }, [year, summary]);
 
   useEffect(() => {
     fetchData();
@@ -312,7 +327,7 @@ export default function Home() {
                 expenses={expenses}
                 settings={settings}
                 summary={summary}
-                onRefreshData={fetchData}
+                onRefreshData={() => fetchData(true)}
                 onAdminProfileUpdated={handleAdminProfileUpdated}
                 onViewReceipt={(payment) => setReceiptPayment(payment)}
                 onOpenMyReceipts={() => setActiveTab('my-ledger')}
@@ -335,7 +350,7 @@ export default function Home() {
               {isHindi ? 'कोर अंशदान:' : 'Core Contribution:'} ₹{settings?.monthlyAmount || 1000}{isHindi ? '/माह' : '/mo'}
             </span>
             <button
-              onClick={fetchData}
+              onClick={() => fetchData(true)}
               className="hover:text-emerald-700 flex items-center gap-1 font-semibold transition cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5" />
