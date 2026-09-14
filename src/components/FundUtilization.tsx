@@ -163,8 +163,39 @@ export const FundUtilization: React.FC<FundUtilizationProps> = ({
 
         <div className="divide-y divide-slate-100">
           {filteredExpenses.length === 0 ? (
-            <div className="py-12 text-center text-slate-400 text-xs">
-              No expenses recorded under this category yet.
+            <div className="py-16 px-4 text-center max-w-lg mx-auto space-y-3">
+              <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200 shadow-xs">
+                <ReceiptIndianRupee className="w-7 h-7 stroke-[2]" />
+              </div>
+              <h4 className="text-base font-black text-slate-900">
+                {selectedCategory !== 'ALL'
+                  ? (isHindi ? `"${CATEGORY_LABELS[selectedCategory as ExpenseCategory]?.hi || selectedCategory}" में कोई खर्च नहीं मिला` : `No expenses under "${CATEGORY_LABELS[selectedCategory as ExpenseCategory]?.en || selectedCategory}"`)
+                  : (isHindi ? 'अभी कोई सार्वजनिक कार्य या खर्च दर्ज नहीं है' : 'No Public Works or Expenses Recorded Yet')}
+              </h4>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                {selectedCategory !== 'ALL' ? (
+                  <>
+                    {isHindi ? 'इस श्रेणी में अभी कोई रिकॉर्ड नहीं है।' : 'No records under this filter.'}{' '}
+                    <button onClick={() => setSelectedCategory('ALL')} className="text-amber-600 font-bold underline cursor-pointer">
+                      {isHindi ? 'सभी श्रेणियां देखें' : 'View all categories'}
+                    </button>
+                  </>
+                ) : (
+                  isHindi 
+                    ? 'सार्वजनिक कार्य या खर्च दर्ज करने हेतु ऊपर दिए गए "+ नया खर्च दर्ज करें" बटन का उपयोग करें। खर्च दर्ज होते ही प्रत्येक प्रविष्टि पर लाल रंग का "हटाएं (Delete)" बटन दिखेगा, जिससे आप गलती से दर्ज या डमी डेटा को तुरंत हटा सकते हैं।' 
+                    : 'To record a public work, click "+ Log New Expense". Once logged, each entry will display a red "Delete / हटाएं" button so you can remove accidental entries or dummy data anytime.'
+                )}
+              </p>
+              {selectedCategory === 'ALL' && (
+                <button
+                  type="button"
+                  onClick={onAddExpenseClick}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition cursor-pointer shadow-xs mt-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{isHindi ? 'पहला सार्वजनिक कार्य दर्ज करें' : 'Log First Public Work'}</span>
+                </button>
+              )}
             </div>
           ) : (
             filteredExpenses.map(expense => {

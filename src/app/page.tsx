@@ -14,6 +14,7 @@ import { LoginScreen } from '@/components/LoginScreen';
 import { ChangePasswordModal } from '@/components/ChangePasswordModal';
 import { AdminProfileModal } from '@/components/AdminProfileModal';
 import { AddPaidMemberModal } from '@/components/AddPaidMemberModal';
+import { AddExpenseModal } from '@/components/AddExpenseModal';
 import { useLanguage } from '@/context/LanguageContext';
 import { 
   TreasurySummary, 
@@ -56,6 +57,7 @@ export default function Home() {
   const [isChangePassOpen, setIsChangePassOpen] = useState<boolean>(false);
   const [isAdminProfileOpen, setIsAdminProfileOpen] = useState<boolean>(false);
   const [isAddPaidMemberOpen, setIsAddPaidMemberOpen] = useState<boolean>(false);
+  const [isAddExpenseOpen, setIsAddExpenseOpen] = useState<boolean>(false);
 
   // Load saved user session and offline instant cache on mount
   useEffect(() => {
@@ -332,7 +334,7 @@ export default function Home() {
                 expenses={expenses}
                 summary={summary}
                 isAdminLoggedIn={isAdmin}
-                onAddExpenseClick={() => setActiveTab('admin')}
+                onAddExpenseClick={() => setIsAddExpenseOpen(true)}
                 onDeleteExpense={handleDeleteExpense}
               />
             )}
@@ -435,6 +437,15 @@ export default function Home() {
         onMemberAdded={fetchData}
         onViewReceipt={(payment) => setReceiptPayment(payment)}
         existingMembers={members}
+      />
+
+      {/* Add Public Work / Expense Modal */}
+      <AddExpenseModal
+        isOpen={isAddExpenseOpen}
+        onClose={() => setIsAddExpenseOpen(false)}
+        adminPin={adminPin}
+        settings={settings}
+        onExpenseAdded={() => fetchData(true)}
       />
     </div>
   );
