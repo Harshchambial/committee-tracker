@@ -869,7 +869,7 @@ export async function updateSettings(updates: Partial<CommitteeSettings>, provid
       const memberPayload: any = {};
       if (updates.adminName) memberPayload.name = updates.adminName;
       if (updates.adminPhone) memberPayload.phone = updates.adminPhone;
-      await supabase.from('members').update(memberPayload).eq('role', 'ADMIN');
+      await supabase.from('members').update(memberPayload).eq('id', 'mem_1');
     }
   }
 
