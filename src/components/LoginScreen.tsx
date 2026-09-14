@@ -34,6 +34,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   // Member form fields
   const [memberName, setMemberName] = useState('');
   const [memberPhone, setMemberPhone] = useState('');
+  const [memberPin, setMemberPin] = useState('');
+  const [showMemberPin, setShowMemberPin] = useState(false);
   const [memberEmail, setMemberEmail] = useState('');
 
   // Admin form fields
@@ -50,7 +52,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
     const cleanPhone = memberPhone.replace(/\D/g, '').slice(-10);
     if (cleanPhone.length < 10) {
-      setErrorMessage('Please enter your 10-digit registered mobile number.');
+      setErrorMessage(isHindi ? 'कृपया 10-अंकों का वैध मोबाइल नंबर दर्ज करें।' : 'Please enter your 10-digit registered mobile number.');
+      return;
+    }
+
+    if (!memberPin.trim()) {
+      setErrorMessage(isHindi ? 'कृपया अपना 4-अंकीय लॉगिन पिन दर्ज करें (डिफ़ॉल्ट 1234 है)।' : 'Please enter your 4-digit PIN (Default is 1234).');
       return;
     }
 
@@ -62,6 +69,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         body: JSON.stringify({
           type: 'MEMBER',
           phone: cleanPhone,
+          pin: memberPin.trim(),
           name: memberName,
           email: memberEmail
         })
@@ -69,7 +77,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Login failed. Please check your mobile number.');
+        throw new Error(data.error || 'Login failed. Please check your mobile number or PIN.');
       }
 
       onLoginSuccess(data.user);
@@ -220,6 +228,42 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               </div>
 
               <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                    {isHindi ? '4-अंकीय लॉगिन पिन *' : '4-Digit Login PIN *'}
+                  </label>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                    {isHindi ? 'प्रारंभिक पिन: 1234' : 'Default PIN: 1234'}
+                  </span>
+                </div>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type={showMemberPin ? 'text' : 'password'}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={4}
+                    placeholder="1234"
+                    value={memberPin}
+                    onChange={(e) => setMemberPin(e.target.value.replace(/\D/g, ''))}
+                    required
+                    className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 font-mono font-bold text-sm tracking-widest text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowMemberPin(!showMemberPin)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    {showMemberPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1">
+                  <span>{isHindi ? 'पहली बार? पिन 1234 भरें' : 'First time? Enter 1234'}</span>
+                  <span>{isHindi ? 'पिन भूल गए? व्यवस्थापक से रीसेट कराएं' : 'Forgot? Contact Admin'}</span>
+                </div>
+              </div>
+
+              <div>
                 <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
                   {isHindi ? 'आपका नाम (वैकल्पिक)' : 'Your Name (Optional)'}
                 </label>
@@ -253,7 +297,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
               <button
                 type="submit"
-                disabled={isLoading || memberPhone.length < 10}
+                disabled={isLoading || memberPhone.length < 10 || memberPin.length !== 4}
                 className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm tracking-wide shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 transition cursor-pointer active:scale-98 disabled:opacity-50 mt-2"
               >
                 <span>{isLoading ? (isHindi ? 'सत्यापित हो रहा है...' : 'Verifying Membership...') : (isHindi ? 'समिति पोर्टल में प्रवेश करें' : 'Enter Committee Portal')}</span>

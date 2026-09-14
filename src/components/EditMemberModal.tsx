@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { X, UserCheck, ShieldCheck, AlertCircle, Phone, User, CheckCircle2 } from 'lucide-react';
-import { Member } from '@/types';
+import { X, UserCheck, ShieldCheck, AlertCircle, Phone, User, CheckCircle2, KeyRound } from 'lucide-react';
+import { Member, UserRole } from '@/types';
 import { useLanguage } from '@/context/LanguageContext';
 
 interface EditMemberModalProps {
@@ -26,10 +26,12 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
   const { isHindi } = useLanguage();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [role, setRole] = useState<'MEMBER' | 'ADMIN'>('MEMBER');
+  const [role, setRole] = useState<UserRole>('MEMBER');
   const [memberType, setMemberType] = useState<'CORE' | 'VOLUNTARY'>('CORE');
   const [status, setStatus] = useState<'ACTIVE' | 'INACTIVE'>('ACTIVE');
   const [notes, setNotes] = useState('');
+  const [isResettingPin, setIsResettingPin] = useState(false);
+  const [pinResetDone, setPinResetDone] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -252,8 +254,9 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                   onChange={(e) => setRole(e.target.value as any)}
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm bg-white"
                 >
-                  <option value="MEMBER">{isHindi ? 'सदस्य' : 'Member'}</option>
-                  <option value="ADMIN">{isHindi ? 'व्यवस्थापक (Admin)' : 'Admin / Organizer'}</option>
+                  <option value="MEMBER">{isHindi ? 'कोर सदस्य (Member)' : 'General Member'}</option>
+                  <option value="CO_ADMIN">{isHindi ? 'सह-व्यवस्थापक (Co-Admin)' : 'Co-Admin'}</option>
+                  <option value="ADMIN">{isHindi ? 'मुख्य व्यवस्थापक (Super Admin)' : 'Super Admin / Organizer'}</option>
                 </select>
               </div>
 
@@ -270,6 +273,52 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                   <option value="INACTIVE">{isHindi ? 'निष्क्रिय (Inactive)' : 'Inactive'}</option>
                 </select>
               </div>
+            </div>
+
+            {/* Quick PIN Reset to 1234 */}
+            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5 truncate">
+                  <KeyRound className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>{isHindi ? 'सदस्य लॉगिन पिन' : 'Member Login PIN'}</span>
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5 truncate">
+                  {pinResetDone 
+                    ? (isHindi ? '✅ पिन 1234 रीसेट हो गया!' : '✅ Reset to 1234!') 
+                    : (isHindi ? 'यदि सदस्य पिन भूल गए हैं तो 1234 करें' : 'Default is 1234 if forgotten')}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!window.confirm(isHindi ? `क्या आप सच में ${name || member.name} का लॉगिन पिन 1234 रीसेट करना चाहते हैं?` : `Reset login PIN for ${name || member.name} to default 1234?`)) {
+                    return;
+                  }
+                  setIsResettingPin(true);
+                  try {
+                    const res = await fetch('/api/auth/change-member-pin', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        memberId: member.id,
+                        adminPin
+                      })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'Failed to reset PIN');
+                    setPinResetDone(true);
+                    setTimeout(() => setPinResetDone(false), 3500);
+                  } catch (err: any) {
+                    alert(err.message);
+                  } finally {
+                    setIsResettingPin(false);
+                  }
+                }}
+                disabled={isResettingPin}
+                className="px-2.5 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 font-black text-xs transition cursor-pointer disabled:opacity-50 shrink-0"
+              >
+                {isResettingPin ? '...' : (isHindi ? 'पिन 1234 रीसेट' : 'Reset to 1234')}
+              </button>
             </div>
 
             <div>

@@ -15,6 +15,7 @@ import { ChangePasswordModal } from '@/components/ChangePasswordModal';
 import { AdminProfileModal } from '@/components/AdminProfileModal';
 import { AddPaidMemberModal } from '@/components/AddPaidMemberModal';
 import { AddExpenseModal } from '@/components/AddExpenseModal';
+import { ChangeMemberPinModal } from '@/components/ChangeMemberPinModal';
 import { useLanguage } from '@/context/LanguageContext';
 import { 
   TreasurySummary, 
@@ -58,6 +59,7 @@ export default function Home() {
   const [isAdminProfileOpen, setIsAdminProfileOpen] = useState<boolean>(false);
   const [isAddPaidMemberOpen, setIsAddPaidMemberOpen] = useState<boolean>(false);
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState<boolean>(false);
+  const [isChangeMemberPinOpen, setIsChangeMemberPinOpen] = useState<boolean>(false);
 
   // Load saved user session and offline instant cache on mount
   useEffect(() => {
@@ -266,6 +268,7 @@ export default function Home() {
         onLogout={handleLogout}
         onOpenChangePassword={() => setIsChangePassOpen(true)}
         onOpenAdminProfile={() => setIsAdminProfileOpen(true)}
+        onOpenChangeMemberPin={() => setIsChangeMemberPinOpen(true)}
         pendingApprovals={summary?.pendingApprovalsCount || 0}
       />
 
@@ -300,6 +303,9 @@ export default function Home() {
                 members={members}
                 settings={settings}
                 summary={summary}
+                currentUser={currentUser}
+                adminPin={adminPin}
+                onRefresh={() => fetchData(true)}
                 onContributeClick={() => handleOpenPayModal(undefined, undefined, undefined, 'PUBLIC_SEVA')}
                 onViewReceipt={(payment) => setReceiptPayment(payment)}
               />
@@ -350,6 +356,7 @@ export default function Home() {
                 expenses={expenses}
                 settings={settings}
                 summary={summary}
+                currentUser={currentUser}
                 onRefreshData={() => fetchData(true)}
                 onAdminProfileUpdated={handleAdminProfileUpdated}
                 onViewReceipt={(payment) => setReceiptPayment(payment)}
@@ -446,6 +453,14 @@ export default function Home() {
         adminPin={adminPin}
         settings={settings}
         onExpenseAdded={() => fetchData(true)}
+      />
+
+      {/* Change Member PIN Modal */}
+      <ChangeMemberPinModal
+        isOpen={isChangeMemberPinOpen}
+        onClose={() => setIsChangeMemberPinOpen(false)}
+        currentUser={currentUser}
+        onPinChanged={() => fetchData(true)}
       />
     </div>
   );

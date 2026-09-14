@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import confetti from 'canvas-confetti';
 import { 
   HeartHandshake, 
   IndianRupee, 
@@ -12,29 +13,52 @@ import {
   Receipt, 
   ShieldCheck, 
   Sparkles,
-  Users
+  Users,
+  Trash2,
+  ArrowRightLeft,
+  X,
+  UserCheck,
+  AlertCircle
 } from 'lucide-react';
-import { PaymentRecord, TreasurySummary, CommitteeSettings } from '@/types';
+import { PaymentRecord, TreasurySummary, CommitteeSettings, AuthUser, Member } from '@/types';
 import { useLanguage } from '@/context/LanguageContext';
 
 interface JanSahayogLedgerProps {
   payments: PaymentRecord[];
-  members?: import('@/types').Member[];
+  members?: Member[];
   summary: TreasurySummary | null;
   settings: CommitteeSettings | null;
+  currentUser?: AuthUser | null;
+  adminPin?: string;
+  onRefresh?: () => void;
   onContributeClick: () => void;
   onViewReceipt: (payment: PaymentRecord) => void;
 }
 
 export const JanSahayogLedger: React.FC<JanSahayogLedgerProps> = ({
   payments,
+  members = [],
   summary,
   settings,
+  currentUser,
+  adminPin = '',
+  onRefresh,
   onContributeClick,
   onViewReceipt
 }) => {
-  const { t, isHindi } = useLanguage();
+  const { t, isHindi, getMonthName } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Conversion Modal State
+  const [convertingPayment, setConvertingPayment] = useState<PaymentRecord | null>(null);
+  const [targetMemberId, setTargetMemberId] = useState<string>('');
+  const [targetMonth, setTargetMonth] = useState<number>(new Date().getMonth() + 1);
+  const [targetYear, setTargetYear] = useState<number>(new Date().getFullYear());
+  const [isSubmittingConvert, setIsSubmittingConvert] = useState(false);
+  const [convertError, setConvertError] = useState<string | null>(null);
+
+  const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'CO_ADMIN';
+  const coreMembers = members.filter(m => m.status === 'ACTIVE' && m.memberType !== 'VOLUNTARY');
 
   // Filter only verified public voluntary contributions
   const publicPayments = payments.filter(p => 
@@ -49,6 +73,76 @@ export const JanSahayogLedger: React.FC<JanSahayogLedgerProps> = ({
   );
 
   const totalRaised = publicPayments.reduce((sum, p) => sum + p.amount, 0);
+
+  // Handle Delete Contribution
+  const handleDeleteContribution = async (item: PaymentRecord) => {
+    const confirmMsg = isHindi
+      ? `क्या आप वाकई "${item.memberName}" का ₹${item.amount.toLocaleString('en-IN')} का यह सहयोग हटाना चाहते हैं?`
+      : `Are you sure you want to delete this contribution of ₹${item.amount.toLocaleString('en-IN')} from "${item.memberName}"?`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const res = await fetch(`/api/payments?id=${item.id}&adminPin=${adminPin}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete payment');
+      onRefresh?.();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  // Open Convert Modal
+  const handleOpenConvertModal = (item: PaymentRecord) => {
+    setConvertingPayment(item);
+    setConvertError(null);
+    setTargetMonth(item.month || new Date().getMonth() + 1);
+    setTargetYear(item.year || new Date().getFullYear());
+
+    // Auto-match member if name exists in core members
+    const matched = coreMembers.find(m => 
+      m.name.toLowerCase().trim() === item.memberName.toLowerCase().trim()
+    );
+    setTargetMemberId(matched ? matched.id : (coreMembers[0]?.id || ''));
+  };
+
+  // Submit Conversion
+  const handleConvertSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!convertingPayment || !targetMemberId) return;
+
+    setIsSubmittingConvert(true);
+    setConvertError(null);
+
+    try {
+      const res = await fetch('/api/payments/convert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paymentId: convertingPayment.id,
+          memberId: targetMemberId,
+          month: Number(targetMonth),
+          year: Number(targetYear),
+          adminPin
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Conversion failed');
+      }
+
+      confetti({ particleCount: 40, spread: 50 });
+      setConvertingPayment(null);
+      onRefresh?.();
+    } catch (err: any) {
+      setConvertError(err.message);
+    } finally {
+      setIsSubmittingConvert(false);
+    }
+  };
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -148,6 +242,7 @@ export const JanSahayogLedger: React.FC<JanSahayogLedgerProps> = ({
                       <span>{new Date(item.paidAt).toLocaleDateString(isHindi ? 'hi-IN' : 'en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                     </div>
                   </div>
+
                   <div className="text-right shrink-0">
                     <span className="text-base sm:text-lg font-black text-amber-600 flex items-center justify-end">
                       <span className="text-xs sm:text-sm mr-0.5">₹</span>
@@ -174,21 +269,168 @@ export const JanSahayogLedger: React.FC<JanSahayogLedgerProps> = ({
                 )}
               </div>
 
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-                <span className="text-[10px] text-slate-400 font-mono truncate">
-                  Ref: {item.utrNumber ? item.utrNumber.slice(-8) : item.method}
-                </span>
-
+              <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2">
                 <button
+                  type="button"
                   onClick={() => onViewReceipt(item)}
-                  className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-600 hover:text-orange-700 hover:underline cursor-pointer"
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-600 hover:text-orange-700 hover:underline cursor-pointer shrink-0"
                 >
                   <Receipt className="w-3.5 h-3.5" />
                   <span>{t('viewReceipt')}</span>
                 </button>
+
+                {/* Admin Management Controls: Convert & Delete */}
+                {isAdmin && (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenConvertModal(item)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] transition cursor-pointer border border-indigo-200"
+                      title={isHindi ? 'कोर सदस्य में बदलें' : 'Convert to Core Member'}
+                    >
+                      <ArrowRightLeft className="w-3 h-3" />
+                      <span>{isHindi ? 'सदस्य में बदलें' : 'Convert'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteContribution(item)}
+                      className="inline-flex items-center gap-1 p-1 sm:px-2 sm:py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[11px] transition cursor-pointer border border-rose-200"
+                      title={isHindi ? 'सहयोग प्रविष्टि हटाएं' : 'Delete contribution'}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span className="hidden sm:inline">{isHindi ? 'हटाएं' : 'Delete'}</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Convert to Core Member Modal */}
+      {convertingPayment && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs overflow-y-auto"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setConvertingPayment(null);
+          }}
+        >
+          <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-7 shadow-2xl border border-slate-200 relative animate-in fade-in zoom-in-95 duration-150 my-auto">
+            <button
+              type="button"
+              onClick={() => setConvertingPayment(null)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 flex items-center justify-center transition cursor-pointer border border-slate-200"
+            >
+              <X className="w-4 h-4 stroke-[2.5]" />
+            </button>
+
+            <div className="text-center pb-4 border-b border-slate-100">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-800 flex items-center justify-center mx-auto mb-2.5 shadow-xs">
+                <ArrowRightLeft className="w-6 h-6" />
+              </div>
+              <h2 className="text-lg font-black text-slate-900 tracking-tight">
+                {isHindi ? 'कोर सदस्य में बदलें' : 'Convert to Core Member'}
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {convertingPayment.memberName} (₹{convertingPayment.amount.toLocaleString('en-IN')})
+              </p>
+            </div>
+
+            {convertError && (
+              <div className="mt-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-bold flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                <span>{convertError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleConvertSubmit} className="space-y-4 pt-4">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                  {isHindi ? 'कोर सदस्य चुनें *' : 'Assign to Core Member *'}
+                </label>
+                <select
+                  value={targetMemberId}
+                  onChange={(e) => setTargetMemberId(e.target.value)}
+                  required
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-bold bg-white text-slate-900"
+                >
+                  {coreMembers.map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} ({m.phone})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  {isHindi 
+                    ? 'यह भुगतान चुने गए सदस्य के 12-माह मैट्रिक्स में दर्ज होगा' 
+                    : 'This payment will be linked to the chosen member in the monthly matrix.'}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    {isHindi ? 'माह *' : 'Month *'}
+                  </label>
+                  <select
+                    value={targetMonth}
+                    onChange={(e) => setTargetMonth(Number(e.target.value))}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm bg-white"
+                  >
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                      <option key={m} value={m}>{getMonthName(m)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    {isHindi ? 'वर्ष *' : 'Year *'}
+                  </label>
+                  <select
+                    value={targetYear}
+                    onChange={(e) => setTargetYear(Number(e.target.value))}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm bg-white"
+                  >
+                    <option value={2026}>2026</option>
+                    <option value={2027}>2027</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl text-xs text-indigo-900 space-y-1">
+                <div className="font-bold flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>{isHindi ? 'मैट्रिक्स अपडेट' : 'Matrix Update'}</span>
+                </div>
+                <p className="text-[11px] leading-relaxed">
+                  {isHindi 
+                    ? `बदलाव के बाद ${getMonthName(targetMonth)} ${targetYear} का बॉक्स सदस्य के नाम के आगे हरा (सत्यापित) हो जाएगा।` 
+                    : `After conversion, ${getMonthName(targetMonth)} ${targetYear} will turn green (verified) in the matrix.`}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setConvertingPayment(null)}
+                  className="w-1/3 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
+                >
+                  {isHindi ? 'रद्द करें' : 'Cancel'}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingConvert || !targetMemberId}
+                  className="w-2/3 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs tracking-wide shadow-md transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {isSubmittingConvert 
+                    ? (isHindi ? 'बदल रहे हैं...' : 'Converting...') 
+                    : (isHindi ? 'बदलाव की पुष्टि करें' : 'Confirm Conversion')}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

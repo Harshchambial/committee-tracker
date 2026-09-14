@@ -10,7 +10,8 @@ import {
   MemberMatrixRow, 
   PaymentStatus,
   PaymentMethod,
-  ContributionType 
+  ContributionType,
+  AdvancePaymentPayload
 } from '@/types';
 import { supabase, isSupabaseConfigured } from './supabase';
 
@@ -114,7 +115,8 @@ export async function getAllMembers(): Promise<Member[]> {
             status: m.status || 'ACTIVE',
             role: m.role || 'MEMBER',
             memberType: (m.member_type as 'CORE' | 'VOLUNTARY') || 'CORE',
-            notes: m.notes || undefined
+            notes: m.notes || undefined,
+            pin: m.pin || '1234'
           }));
         } else {
           // Supabase connected but 0 members - seed the admin organizer
@@ -127,7 +129,8 @@ export async function getAllMembers(): Promise<Member[]> {
               joined_year: 2026,
               status: 'ACTIVE',
               role: 'ADMIN',
-              notes: 'Committee President / Organizer'
+              notes: 'Committee President / Organizer',
+              pin: '1234'
             };
             const seedRes = await supabase.from('members').insert(adminSeed).select();
             if (!seedRes.error && seedRes.data && seedRes.data.length > 0) {
@@ -141,7 +144,8 @@ export async function getAllMembers(): Promise<Member[]> {
                 status: m.status || 'ACTIVE',
                 role: m.role || 'MEMBER',
                 memberType: (m.member_type as 'CORE' | 'VOLUNTARY') || 'CORE',
-                notes: m.notes || undefined
+                notes: m.notes || undefined,
+                pin: m.pin || '1234'
               }));
             }
           } catch (seedErr) {
@@ -156,7 +160,8 @@ export async function getAllMembers(): Promise<Member[]> {
   const db = getDatabase();
   return db.members.map(m => ({
     ...m,
-    memberType: m.memberType || 'CORE'
+    memberType: m.memberType || 'CORE',
+    pin: m.pin || '1234'
   }));
 }
 
@@ -173,7 +178,8 @@ export async function addMember(memberData: Omit<Member, 'id'>): Promise<Member>
     ...memberData, 
     phone: cleanPhone,
     id,
-    memberType: memberData.memberType || 'CORE'
+    memberType: memberData.memberType || 'CORE',
+    pin: memberData.pin || '1234'
   };
 
   if (isSupabaseConfigured && supabase) {
@@ -187,7 +193,8 @@ export async function addMember(memberData: Omit<Member, 'id'>): Promise<Member>
       status: newMember.status || 'ACTIVE',
       role: newMember.role || 'MEMBER',
       member_type: newMember.memberType || 'CORE',
-      notes: newMember.notes || null
+      notes: newMember.notes || null,
+      pin: newMember.pin || '1234'
     };
 
     const { error } = await supabase.from('members').insert(insertData);
@@ -195,8 +202,9 @@ export async function addMember(memberData: Omit<Member, 'id'>): Promise<Member>
       if (error.code === '42501' || error.message?.includes('row-level security')) {
         throw new Error('Supabase RLS Error: Row Level Security is blocking member creation. Please run the SQL fix in Supabase SQL Editor.');
       }
-      console.warn('Supabase add member failed with member_type, retrying without it:', error.message);
+      console.warn('Supabase add member failed with extended columns, retrying without member_type & pin:', error.message);
       delete insertData.member_type;
+      delete insertData.pin;
       const retryRes = await supabase.from('members').insert(insertData);
       if (retryRes.error) {
         console.error('Supabase add member retry error:', retryRes.error.message);
@@ -238,13 +246,16 @@ export async function updateMember(id: string, updates: Partial<Member>): Promis
     if (updates.role !== undefined) updatePayload.role = updates.role;
     if (updates.memberType !== undefined) updatePayload.member_type = updates.memberType;
     if (updates.notes !== undefined) updatePayload.notes = updates.notes;
+    if (updates.pin !== undefined) updatePayload.pin = updates.pin;
+
     const { error } = await supabase.from('members').update(updatePayload).eq('id', id);
     if (error) {
       if (error.code === '42501' || error.message?.includes('row-level security')) {
         throw new Error('Supabase RLS Error: Row Level Security is blocking member updates. Please run the SQL fix in Supabase SQL Editor.');
       }
-      if (error.message?.includes('member_type')) {
+      if (error.message?.includes('member_type') || error.message?.includes('pin')) {
         delete updatePayload.member_type;
+        delete updatePayload.pin;
         const retryRes = await supabase.from('members').update(updatePayload).eq('id', id);
         if (retryRes.error) throw new Error(`Database error updating member: ${retryRes.error.message}`);
       } else {
@@ -269,11 +280,51 @@ export async function updateMember(id: string, updates: Partial<Member>): Promis
     status: updates.status || 'ACTIVE',
     role: updates.role || 'MEMBER',
     memberType: updates.memberType || 'CORE',
-    notes: updates.notes
+    notes: updates.notes,
+    pin: updates.pin || '1234'
   };
   db.members.push(fallbackMember);
   saveDatabase(db);
   return fallbackMember;
+}
+
+export async function updateMemberPin(
+  memberId: string, 
+  currentPin: string, 
+  newPin: string
+): Promise<{ success: boolean; message: string }> {
+  const cleanNewPin = newPin.trim();
+  if (!/^\d{4}$/.test(cleanNewPin)) {
+    throw new Error('New PIN must be exactly 4 digits (0-9). / नया पिन ठीक 4 अंकों का होना चाहिए।');
+  }
+
+  const members = await getAllMembers();
+  const member = members.find(m => m.id === memberId);
+  if (!member) {
+    throw new Error('Member not found. / सदस्य नहीं मिला।');
+  }
+
+  const expectedPin = (member.pin && member.pin.trim()) || '1234';
+  if (currentPin.trim() !== expectedPin) {
+    throw new Error('Current PIN is incorrect. (Default PIN is 1234). / वर्तमान पिन गलत है। (डिफ़ॉल्ट 1234 है)');
+  }
+
+  await updateMember(memberId, { pin: cleanNewPin });
+  return { success: true, message: 'PIN updated successfully! / पिन सफलतापूर्वक बदल दिया गया!' };
+}
+
+export async function adminResetMemberPin(memberId: string): Promise<{ success: boolean; message: string }> {
+  const members = await getAllMembers();
+  const member = members.find(m => m.id === memberId);
+  if (!member) {
+    throw new Error('Member not found. / सदस्य नहीं मिला।');
+  }
+
+  await updateMember(memberId, { pin: '1234' });
+  return { 
+    success: true, 
+    message: `PIN for ${member.name} has been reset to 1234. / ${member.name} का पिन 1234 पर रीसेट कर दिया गया है।` 
+  };
 }
 
 export async function deleteMember(id: string): Promise<void> {
@@ -671,6 +722,204 @@ export async function verifyPayment(
 
   saveDatabase(db);
   return payment;
+}
+
+export async function deletePayment(id: string): Promise<void> {
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase.from('payments').delete().eq('id', id);
+    if (error) {
+      if (error.code === '42501' || error.message?.includes('row-level security')) {
+        throw new Error('Supabase RLS Error: Row Level Security is blocking payment deletion. Please run the SQL fix in Supabase SQL Editor.');
+      }
+      throw new Error(`Database error deleting payment: ${error.message}`);
+    }
+  }
+
+  const db = getDatabase();
+  db.payments = db.payments.filter(p => p.id !== id);
+  saveDatabase(db);
+}
+
+export async function convertPaymentToCore(
+  paymentId: string, 
+  memberId: string, 
+  month: number, 
+  year: number
+): Promise<PaymentRecord> {
+  const members = await getAllMembers();
+  const member = members.find(m => m.id === memberId);
+  if (!member) {
+    throw new Error('Member not found. Please select a valid core member.');
+  }
+
+  const payments = await getAllPayments();
+  const payment = payments.find(p => p.id === paymentId);
+  if (!payment) {
+    throw new Error('Payment record not found.');
+  }
+
+  // Check if member already has this month paid
+  const existing = payments.find(p => 
+    p.id !== paymentId && 
+    p.memberId === memberId && 
+    p.month === month && 
+    p.year === year && 
+    (p.contributionType || 'CORE_MONTHLY') === 'CORE_MONTHLY' &&
+    p.status === 'VERIFIED'
+  );
+  if (existing) {
+    throw new Error(`Member "${member.name}" already has a verified payment for ${getMonthName(month)} ${year}.`);
+  }
+
+  const updatedNotes = `Converted from Jan Sahayog (${payment.memberName}). Original purpose: ${payment.purpose || 'Seva'}`;
+
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase.from('payments').update({
+      member_id: member.id,
+      member_name: member.name,
+      month,
+      year,
+      contribution_type: 'CORE_MONTHLY',
+      notes: updatedNotes,
+      status: 'VERIFIED'
+    }).eq('id', paymentId);
+
+    if (error) {
+      if (error.code === '42501' || error.message?.includes('row-level security')) {
+        throw new Error('Supabase RLS Error: Row Level Security is blocking payment conversion.');
+      }
+      throw new Error(`Database error converting payment: ${error.message}`);
+    }
+  }
+
+  const db = getDatabase();
+  const localPayment = db.payments.find(p => p.id === paymentId);
+  if (localPayment) {
+    localPayment.memberId = member.id;
+    localPayment.memberName = member.name;
+    localPayment.month = month;
+    localPayment.year = year;
+    localPayment.contributionType = 'CORE_MONTHLY';
+    localPayment.notes = updatedNotes;
+    localPayment.status = 'VERIFIED';
+    saveDatabase(db);
+    return localPayment;
+  }
+
+  return {
+    ...payment,
+    memberId: member.id,
+    memberName: member.name,
+    month,
+    year,
+    contributionType: 'CORE_MONTHLY',
+    notes: updatedNotes,
+    status: 'VERIFIED'
+  };
+}
+
+export async function logAdvancePayment(data: AdvancePaymentPayload): Promise<{ 
+  records: PaymentRecord[]; 
+  totalMonths: number; 
+  totalAmount: number; 
+  batchId: string;
+  member: Member;
+}> {
+  const members = await getAllMembers();
+  const member = members.find(m => m.id === data.memberId);
+  if (!member) {
+    throw new Error('Member not found. Please select a valid core member.');
+  }
+
+  const totalMonths = Math.max(1, Math.min(60, Math.floor(data.totalMonths || 1)));
+  const totalAmount = data.amount;
+  const amountPerMonth = Math.round(totalAmount / totalMonths);
+  const batchId = `ADV-${Date.now().toString().slice(-6)}`;
+  const nowIso = new Date().toISOString();
+  const verifiedBy = data.verifiedBy || 'Narinder Singh';
+
+  const payments = await getAllPayments();
+  const recordsToCreate: PaymentRecord[] = [];
+
+  for (let i = 0; i < totalMonths; i++) {
+    const month = ((data.startMonth - 1 + i) % 12) + 1;
+    const year = data.startYear + Math.floor((data.startMonth - 1 + i) / 12);
+
+    // Check if month already paid
+    const existing = payments.find(p => 
+      p.memberId === member.id && 
+      p.month === month && 
+      p.year === year && 
+      (p.contributionType || 'CORE_MONTHLY') === 'CORE_MONTHLY' &&
+      p.status === 'VERIFIED'
+    );
+
+    if (existing) {
+      throw new Error(`Month ${getMonthName(month)} ${year} has already been verified for ${member.name}. Please select a starting month that is unpaid.`);
+    }
+
+    const rec: PaymentRecord = {
+      id: `pay_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 6)}`,
+      memberId: member.id,
+      memberName: member.name,
+      month,
+      year,
+      amount: amountPerMonth,
+      utrNumber: data.method === 'CASH' ? `CASH-${batchId}-${i + 1}` : `${batchId}-${i + 1}`,
+      method: data.method,
+      status: 'VERIFIED',
+      contributionType: 'CORE_MONTHLY',
+      paidAt: nowIso,
+      verifiedAt: nowIso,
+      verifiedBy,
+      notes: `Advance Payment (${i + 1}/${totalMonths}) [Batch: ${batchId}]. ${data.notes || ''}`.trim()
+    };
+    recordsToCreate.push(rec);
+  }
+
+  // Insert into Supabase
+  if (isSupabaseConfigured && supabase) {
+    const rowsToInsert = recordsToCreate.map(r => ({
+      id: r.id,
+      member_id: r.memberId,
+      member_name: r.memberName,
+      month: r.month,
+      year: r.year,
+      amount: r.amount,
+      utr_number: r.utrNumber,
+      method: r.method,
+      status: r.status,
+      contribution_type: r.contributionType,
+      paid_at: r.paidAt,
+      verified_at: r.verifiedAt,
+      verified_by: r.verifiedBy,
+      notes: r.notes
+    }));
+
+    const { error } = await supabase.from('payments').insert(rowsToInsert);
+    if (error) {
+      if (error.code === '42501' || error.message?.includes('row-level security')) {
+        throw new Error('Supabase RLS Error: Row Level Security is blocking payment creation.');
+      }
+      console.warn('Supabase batch advance insert failed, trying one by one:', error.message);
+      for (const row of rowsToInsert) {
+        await supabase.from('payments').insert(row);
+      }
+    }
+  }
+
+  // Insert into local DB
+  const db = getDatabase();
+  db.payments.push(...recordsToCreate);
+  saveDatabase(db);
+
+  return {
+    records: recordsToCreate,
+    totalMonths,
+    totalAmount,
+    batchId,
+    member
+  };
 }
 
 // ================= EXPENSE OPERATIONS =================

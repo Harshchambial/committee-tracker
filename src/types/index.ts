@@ -12,6 +12,8 @@ export type ExpenseCategory =
 
 export type ContributionType = 'CORE_MONTHLY' | 'PUBLIC_SEVA';
 
+export type UserRole = 'MEMBER' | 'ADMIN' | 'CO_ADMIN' | 'SUPER_ADMIN';
+
 export interface Member {
   id: string;
   name: string;
@@ -20,10 +22,21 @@ export interface Member {
   joinedMonth: number; // 1-12
   joinedYear: number;
   status: 'ACTIVE' | 'INACTIVE';
-  role: 'MEMBER' | 'ADMIN';
+  role: UserRole;
   memberType?: 'CORE' | 'VOLUNTARY';
   notes?: string;
   pin?: string;
+}
+
+export interface AdvancePaymentPayload {
+  memberId: string;
+  startMonth: number;
+  startYear: number;
+  totalMonths: number;
+  amount: number;
+  method: PaymentMethod;
+  notes?: string;
+  verifiedBy?: string;
 }
 
 export interface PaymentRecord {
@@ -118,5 +131,5 @@ export interface AuthUser {
   name: string;
   phone?: string;
   email?: string;
-  role: 'ADMIN' | 'MEMBER';
+  role: UserRole;
 }

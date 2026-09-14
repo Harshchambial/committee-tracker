@@ -60,6 +60,21 @@ export async function POST(request: Request) {
         }, { status: 403 });
       }
 
+      if (!pin) {
+        return NextResponse.json({
+          success: false,
+          error: 'Please enter your 4-digit PIN. (Default PIN is 1234) / कृपया अपना 4-अंकों का पिन दर्ज करें (डिफ़ॉल्ट 1234 है)।'
+        }, { status: 400 });
+      }
+
+      const expectedPin = (matchedMember.pin && matchedMember.pin.trim()) || '1234';
+      if (pin.toString().trim() !== expectedPin) {
+        return NextResponse.json({
+          success: false,
+          error: 'Incorrect PIN. Default PIN is 1234. If forgotten, ask Admin to reset it. / गलत पिन। प्रारंभिक पिन 1234 है।'
+        }, { status: 401 });
+      }
+
       return NextResponse.json({
         success: true,
         user: {

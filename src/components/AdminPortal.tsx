@@ -62,6 +62,7 @@ interface AdminPortalProps {
   expenses: ExpenseRecord[];
   settings: CommitteeSettings | null;
   summary: TreasurySummary | null;
+  currentUser?: import('@/types').AuthUser | null;
   onRefreshData: () => void;
   onAdminProfileUpdated?: (updatedUser: import('@/types').AuthUser, newPin?: string) => void;
   onViewReceipt?: (payment: PaymentRecord) => void;
@@ -83,12 +84,16 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   expenses,
   settings,
   summary,
+  currentUser,
   onRefreshData,
   onAdminProfileUpdated,
   onViewReceipt,
   onOpenMyReceipts
 }) => {
   const { isHindi, t, getMonthName } = useLanguage();
+
+  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN' || (!currentUser?.role || currentUser?.role === 'ADMIN') || (currentUser?.id === 'mem_1' || currentUser?.name?.toLowerCase().includes('narinder'));
+  const isCoAdmin = currentUser?.role === 'CO_ADMIN';
 
   // Login PIN state
   const [pinInput, setPinInput] = useState('');
@@ -135,6 +140,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
   // Offline Payment form state
   const [offlineType, setOfflineType] = useState<ContributionType>('CORE_MONTHLY');
+  const [isAdvanceMode, setIsAdvanceMode] = useState(false);
+  const [advanceMonthsCount, setAdvanceMonthsCount] = useState<number>(15);
   const [offlinePurpose, setOfflinePurpose] = useState('सामान्य विकास एवं जन कल्याण');
   const [offlineMemberId, setOfflineMemberId] = useState(members[0]?.id || '');
   const [offlineMonth, setOfflineMonth] = useState(new Date().getMonth() + 1);
@@ -261,30 +268,56 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setFeedbackMessage(null);
 
     try {
-      const res = await fetch('/api/payments/offline', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          memberId: offlineMemberId,
-          month: offlineMonth,
-          year: offlineYear,
-          amount: Number(offlineAmount),
-          method: offlineMethod,
-          notes: offlineNotes,
-          contributionType: offlineType,
-          purpose: offlineType === 'PUBLIC_SEVA' ? offlinePurpose : undefined,
-          adminPin,
-          verifiedBy: settings?.adminName || 'Admin'
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (isAdvanceMode && offlineType === 'CORE_MONTHLY') {
+        const res = await fetch('/api/payments/advance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            memberId: offlineMemberId,
+            startMonth: offlineMonth,
+            startYear: offlineYear,
+            totalMonths: advanceMonthsCount,
+            amount: Number(offlineAmount),
+            method: offlineMethod,
+            notes: offlineNotes,
+            adminPin,
+            verifiedBy: settings?.adminName || 'Narinder Singh'
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
 
-      confetti({ particleCount: 50, spread: 50 });
-      setFeedbackMessage({ 
-        type: 'success', 
-        text: isHindi ? 'नकद भुगतान सत्यापित एवं कोष में दर्ज हो गया!' : 'Offline payment verified and recorded!' 
-      });
+        confetti({ particleCount: 70, spread: 70 });
+        setFeedbackMessage({ 
+          type: 'success', 
+          text: data.message || (isHindi ? 'अग्रिम भुगतान सफलतापूर्वक दर्ज हो गया!' : 'Advance payment recorded successfully!')
+        });
+      } else {
+        const res = await fetch('/api/payments/offline', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            memberId: offlineMemberId,
+            month: offlineMonth,
+            year: offlineYear,
+            amount: Number(offlineAmount),
+            method: offlineMethod,
+            notes: offlineNotes,
+            contributionType: offlineType,
+            purpose: offlineType === 'PUBLIC_SEVA' ? offlinePurpose : undefined,
+            adminPin,
+            verifiedBy: settings?.adminName || 'Admin'
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        confetti({ particleCount: 50, spread: 50 });
+        setFeedbackMessage({ 
+          type: 'success', 
+          text: isHindi ? 'नकद भुगतान सत्यापित एवं कोष में दर्ज हो गया!' : 'Offline payment verified and recorded!' 
+        });
+      }
       setOfflineNotes('');
       onRefreshData();
     } catch (err: any) {
@@ -911,11 +944,86 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               </select>
             </div>
 
+            {offlineType === 'CORE_MONTHLY' && (
+              <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 mb-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAdvanceMode(false);
+                    setOfflineAmount(settings?.monthlyAmount || 1000);
+                  }}
+                  className={`flex-1 py-1.5 px-3 rounded-lg font-bold text-xs transition cursor-pointer ${
+                    !isAdvanceMode ? 'bg-white text-emerald-950 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {isHindi ? '1 माह (₹1,000)' : 'Single Month (₹1,000)'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAdvanceMode(true);
+                    setOfflineAmount(advanceMonthsCount * (settings?.monthlyAmount || 1000));
+                  }}
+                  className={`flex-1 py-1.5 px-3 rounded-lg font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                    isAdvanceMode ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span>⚡</span>
+                  <span>{isHindi ? 'अग्रिम एकमुश्त (Multi-Month)' : 'Advance Lump-Sum'}</span>
+                </button>
+              </div>
+            )}
+
+            {/* Advance Presets & Live Coverage Preview */}
+            {offlineType === 'CORE_MONTHLY' && isAdvanceMode && (
+              <div className="p-3 bg-emerald-50/80 rounded-2xl border border-emerald-200 space-y-2">
+                <label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider">
+                  {isHindi ? 'अग्रिम अवधि चुनें (त्वरित बटन)' : 'Quick Advance Duration'}
+                </label>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[3, 6, 12, 15].map((cnt) => (
+                    <button
+                      key={cnt}
+                      type="button"
+                      onClick={() => {
+                        setAdvanceMonthsCount(cnt);
+                        setOfflineAmount(cnt * (settings?.monthlyAmount || 1000));
+                      }}
+                      className={`py-2 px-1 text-center rounded-xl font-black text-xs transition cursor-pointer border ${
+                        advanceMonthsCount === cnt
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                          : 'bg-white text-emerald-900 border-emerald-200 hover:bg-emerald-100'
+                      }`}
+                    >
+                      <div>{cnt} {isHindi ? 'माह' : 'Mos'}</div>
+                      <div className="text-[10px] opacity-80">₹{(cnt * 1000).toLocaleString('en-IN')}</div>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Dynamic Calculated Date Range */}
+                {(() => {
+                  const endM = ((offlineMonth - 1 + advanceMonthsCount - 1) % 12) + 1;
+                  const endY = offlineYear + Math.floor((offlineMonth - 1 + advanceMonthsCount - 1) / 12);
+                  return (
+                    <div className="text-[11px] font-black text-emerald-950 pt-1 flex items-center gap-1.5 bg-white/70 p-2 rounded-xl border border-emerald-200/60">
+                      <span>📅</span>
+                      <span className="truncate">
+                        {isHindi 
+                          ? `${advanceMonthsCount} माह: ${getMonthName(offlineMonth)} ${offlineYear} → ${getMonthName(endM)} ${endY}` 
+                          : `Covers ${advanceMonthsCount} Mos: ${getMonthName(offlineMonth)} ${offlineYear} → ${getMonthName(endM)} ${endY}`}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
             {offlineType === 'CORE_MONTHLY' ? (
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                    {isHindi ? 'माह *' : 'Month *'}
+                    {isHindi ? (isAdvanceMode ? 'प्रारंभिक माह *' : 'माह *') : (isAdvanceMode ? 'Starting Month *' : 'Month *')}
                   </label>
                   <select
                     value={offlineMonth}
@@ -930,7 +1038,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                    {isHindi ? 'वर्ष *' : 'Year *'}
+                    {isHindi ? (isAdvanceMode ? 'प्रारंभिक वर्ष *' : 'वर्ष *') : (isAdvanceMode ? 'Starting Year *' : 'Year *')}
                   </label>
                   <select
                     value={offlineYear}
@@ -972,12 +1080,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  {isHindi ? 'राशि (₹) *' : 'Amount (₹) *'}
+                  {isHindi ? (isAdvanceMode ? 'कुल राशि (₹) *' : 'राशि (₹) *') : (isAdvanceMode ? 'Total Amount (₹) *' : 'Amount (₹) *')}
                 </label>
                 <input
                   type="number"
                   value={offlineAmount}
-                  onChange={(e) => setOfflineAmount(Number(e.target.value))}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setOfflineAmount(val);
+                    if (isAdvanceMode) {
+                      const monthly = settings?.monthlyAmount || 1000;
+                      setAdvanceMonthsCount(Math.max(1, Math.round(val / monthly)));
+                    }
+                  }}
                   required
                   min={1}
                   className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-black text-slate-900"
@@ -1005,7 +1120,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               </label>
               <input
                 type="text"
-                placeholder={isHindi ? 'जैसे: मासिक बैठक में नकद प्राप्त हुआ' : 'e.g. Received cash during monthly colony meeting'}
+                placeholder={isHindi ? 'जैसे: 15 माह का अग्रिम अंशदान एकमुश्त प्राप्त' : 'e.g. Received 15 months advance contribution'}
                 value={offlineNotes}
                 onChange={(e) => setOfflineNotes(e.target.value)}
                 className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm"
@@ -1015,17 +1130,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             <button
               type="submit"
               disabled={actionLoading}
-              className={`w-full py-3 rounded-xl text-white font-black text-xs shadow-md transition cursor-pointer disabled:opacity-50 ${
+              className={`w-full py-3.5 rounded-xl text-white font-black text-xs shadow-md transition cursor-pointer disabled:opacity-50 ${
                 offlineType === 'CORE_MONTHLY'
-                  ? 'bg-slate-900 hover:bg-slate-800'
+                  ? (isAdvanceMode ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20' : 'bg-slate-900 hover:bg-slate-800')
                   : 'bg-indigo-900 hover:bg-indigo-800'
               }`}
             >
               {actionLoading 
                 ? (isHindi ? 'सत्यापित हो रहा है...' : 'Logging...') 
+                : isAdvanceMode && offlineType === 'CORE_MONTHLY'
+                ? (isHindi ? `अग्रिम ₹${Number(offlineAmount).toLocaleString('en-IN')} दर्ज करें (${advanceMonthsCount} माह)` : `Record Advance ₹${Number(offlineAmount).toLocaleString('en-IN')} (${advanceMonthsCount} Months)`)
                 : (isHindi 
-                    ? `सत्यापित करें एवं ₹${offlineAmount} कोष में जोड़ें` 
-                    : `Verify & Credit Cash (₹${offlineAmount})`)}
+                    ? `सत्यापित करें एवं ₹${Number(offlineAmount).toLocaleString('en-IN')} कोष में जोड़ें` 
+                    : `Verify & Add ₹${Number(offlineAmount).toLocaleString('en-IN')} to Treasury`)}
             </button>
           </form>
         </div>
@@ -1555,7 +1672,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         <span>{member.name}</span>
                         {member.role === 'ADMIN' && (
                           <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-amber-100 text-amber-800 font-extrabold">
-                            Admin
+                            {isHindi ? '👑 मुख्य व्यवस्थापक' : '👑 Super Admin'}
+                          </span>
+                        )}
+                        {member.role === 'CO_ADMIN' && (
+                          <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-purple-100 text-purple-800 font-extrabold">
+                            {isHindi ? '🛡️ सह-व्यवस्थापक' : '🛡️ Co-Admin'}
                           </span>
                         )}
                         {member.memberType === 'VOLUNTARY' ? (
@@ -1595,15 +1717,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       <span className="hidden sm:inline">Edit</span>
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteMember(member.id, member.name)}
-                      className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center gap-1 transition cursor-pointer"
-                      title={`Delete ${member.name}`}
-                    >
-                      <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                      <span className="hidden sm:inline">Delete</span>
-                    </button>
+                    {isSuperAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMember(member.id, member.name)}
+                        className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center gap-1 transition cursor-pointer"
+                        title={`Delete ${member.name}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                        <span className="hidden sm:inline">Delete</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS members (
 
 -- Migration for members table:
 ALTER TABLE members ADD COLUMN IF NOT EXISTS member_type TEXT DEFAULT 'CORE';
+ALTER TABLE members ADD COLUMN IF NOT EXISTS pin TEXT DEFAULT '1234';
 
 -- 3. Create Payments Table
 CREATE TABLE IF NOT EXISTS payments (

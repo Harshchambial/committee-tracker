@@ -16,7 +16,9 @@ import {
   Languages,
   ChevronDown,
   Settings as SettingsIcon,
-  Sparkles
+  Sparkles,
+  KeyRound,
+  Lock
 } from 'lucide-react';
 import { CommitteeSettings, TreasurySummary, AuthUser } from '@/types';
 import { useLanguage } from '@/context/LanguageContext';
@@ -30,6 +32,7 @@ interface NavbarProps {
   onLogout: () => void;
   onOpenChangePassword?: () => void;
   onOpenAdminProfile?: () => void;
+  onOpenChangeMemberPin?: () => void;
   pendingApprovals: number;
 }
 
@@ -41,6 +44,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
   onLogout,
   onOpenAdminProfile,
+  onOpenChangeMemberPin,
   pendingApprovals
 }) => {
   const { t, language, toggleLanguage, isHindi } = useLanguage();
@@ -265,6 +269,30 @@ export const Navbar: React.FC<NavbarProps> = ({
                               </div>
                               <div className="text-[10px] text-slate-400 font-normal">
                                 {isHindi ? 'नाम, मोबाइल और 4-अंकीय पिन बदलें' : 'Update name, mobile & 4-digit PIN'}
+                              </div>
+                            </div>
+                          </button>
+                        )}
+
+                        {/* 3. Member Change PIN (if regular member) */}
+                        {!isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onOpenChangeMemberPin?.();
+                              setIsUserMenuOpen(false);
+                            }}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-950 transition cursor-pointer"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                              <KeyRound className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <div className="text-slate-900 font-extrabold">
+                                {isHindi ? 'लॉगिन पिन बदलें' : 'Change Login PIN'}
+                              </div>
+                              <div className="text-[10px] text-slate-400 font-normal">
+                                {isHindi ? 'अपना 4-अंकीय निजी पिन अपडेट करें' : 'Update your personal 4-digit PIN'}
                               </div>
                             </div>
                           </button>
