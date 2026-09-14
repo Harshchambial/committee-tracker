@@ -1,16 +1,29 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { LanguageProvider } from "@/context/LanguageContext";
 
+export const viewport: Viewport = {
+  themeColor: "#059669",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+};
+
 export const metadata: Metadata = {
-  title: "Samiti - Committee Fund & Payment Tracker",
+  title: "Vikas Samiti - Committee Fund & Payment Tracker",
   description: "Transparent monthly ₹1,000 contribution tracker, UPI payment verification, and fund utilization ledger.",
+  applicationName: "Vikas Samiti",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Vikas Samiti",
+  },
   icons: {
     icon: [
-      { url: '/favicon.svg', type: 'image/svg+xml' },
       { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
     ],
-    apple: '/favicon.svg',
+    apple: '/icon.svg',
   }
 };
 
