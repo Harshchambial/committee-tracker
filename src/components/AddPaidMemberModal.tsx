@@ -29,6 +29,7 @@ interface AddPaidMemberModalProps {
   settings: CommitteeSettings | null;
   onMemberAdded: () => void;
   onViewReceipt?: (payment: PaymentRecord) => void;
+  existingMembers?: Member[];
 }
 
 export const AddPaidMemberModal: React.FC<AddPaidMemberModalProps> = ({
@@ -37,7 +38,8 @@ export const AddPaidMemberModal: React.FC<AddPaidMemberModalProps> = ({
   adminPin,
   settings,
   onMemberAdded,
-  onViewReceipt
+  onViewReceipt,
+  existingMembers = []
 }) => {
   const { isHindi, getMonthName } = useLanguage();
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -113,6 +115,19 @@ export const AddPaidMemberModal: React.FC<AddPaidMemberModalProps> = ({
     if (cleanPhone.length < 10) {
       setErrorMessage(isHindi ? 'कृपया 10 अंकों का वैध मोबाइल नंबर दर्ज करें।' : 'Please enter a valid 10-digit mobile number.');
       return;
+    }
+
+    // Client-side duplicate phone check
+    if (existingMembers && existingMembers.length > 0) {
+      const dup = existingMembers.find(m => m.phone?.replace(/\D/g, '').slice(-10) === cleanPhone);
+      if (dup) {
+        setErrorMessage(
+          isHindi 
+            ? `यह मोबाइल नंबर (${cleanPhone}) पहले से सदस्य "${dup.name}" के नाम पर पंजीकृत है। कृपया दूसरा मोबाइल नंबर दर्ज करें।`
+            : `Mobile number (${cleanPhone}) is already registered with member "${dup.name}". Please use a unique mobile number.`
+        );
+        return;
+      }
     }
 
     if (hasPaid && (!paidAmount || paidAmount <= 0)) {

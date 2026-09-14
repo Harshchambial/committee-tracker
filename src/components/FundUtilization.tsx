@@ -210,13 +210,14 @@ export const FundUtilization: React.FC<FundUtilizationProps> = ({
                       {expense.amount.toLocaleString('en-IN')}
                     </div>
 
-                    {isAdminLoggedIn && onDeleteExpense && (
+                    {onDeleteExpense && (
                       <button
                         onClick={() => onDeleteExpense(expense.id)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                        title="Delete expense entry"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 font-bold text-xs transition cursor-pointer shadow-2xs"
+                        title={isHindi ? 'इस कार्य/व्यय रिकॉर्ड को हटाएं' : 'Delete this public work record'}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>{isHindi ? 'हटाएं' : 'Delete'}</span>
                       </button>
                     )}
                   </div>

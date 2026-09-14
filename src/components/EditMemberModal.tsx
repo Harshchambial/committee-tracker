@@ -12,6 +12,7 @@ interface EditMemberModalProps {
   member: Member | null;
   adminPin: string;
   onMemberUpdated: () => void;
+  existingMembers?: Member[];
 }
 
 export const EditMemberModal: React.FC<EditMemberModalProps> = ({
@@ -19,7 +20,8 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
   onClose,
   member,
   adminPin,
-  onMemberUpdated
+  onMemberUpdated,
+  existingMembers = []
 }) => {
   const { isHindi } = useLanguage();
   const [name, setName] = useState('');
@@ -67,13 +69,26 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
     const cleanPhone = phone.trim().replace(/\D/g, '').slice(-10);
 
     if (!cleanName) {
-      setErrorMessage('Member full name is required.');
+      setErrorMessage(isHindi ? 'कृपया सदस्य का पूरा नाम दर्ज करें।' : 'Member full name is required.');
       return;
     }
 
     if (cleanPhone.length < 10) {
-      setErrorMessage('Please enter a valid 10-digit mobile number.');
+      setErrorMessage(isHindi ? 'कृपया 10 अंकों का वैध मोबाइल नंबर दर्ज करें।' : 'Please enter a valid 10-digit mobile number.');
       return;
+    }
+
+    // Client-side duplicate check against other members
+    if (existingMembers && existingMembers.length > 0) {
+      const dup = existingMembers.find(m => m.id !== member.id && m.phone?.replace(/\D/g, '').slice(-10) === cleanPhone);
+      if (dup) {
+        setErrorMessage(
+          isHindi
+            ? `यह मोबाइल नंबर (${cleanPhone}) पहले से सदस्य "${dup.name}" के नाम पर पंजीकृत है।`
+            : `Mobile number (${cleanPhone}) is already registered with member "${dup.name}".`
+        );
+        return;
+      }
     }
 
     setIsLoading(true);

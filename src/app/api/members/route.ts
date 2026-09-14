@@ -30,6 +30,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Valid 10-digit mobile number is mandatory (10 अंकों का मोबाइल नंबर अनिवार्य है)' }, { status: 400 });
     }
 
+    // Duplicate Phone Number Check (Unique 10-digit mobile number, same names are allowed)
+    const existingMembers = await getAllMembers();
+    const duplicateMember = existingMembers.find(m => m.phone?.replace(/\D/g, '').slice(-10) === cleanPhone);
+    if (duplicateMember) {
+      return NextResponse.json({ 
+        error: `Mobile number (${cleanPhone}) is already registered with member "${duplicateMember.name}". Each member must have a unique mobile number. (यह मोबाइल नंबर पहले से सदस्य "${duplicateMember.name}" के नाम पर पंजीकृत है। कृपया दूसरा मोबाइल नंबर दर्ज करें।)` 
+      }, { status: 400 });
+    }
+
     const now = new Date();
     const newMember = await addMember({
       name: cleanName,
@@ -91,6 +100,21 @@ export async function PUT(request: Request) {
 
     if (!id) {
       return NextResponse.json({ error: 'Member ID is required' }, { status: 400 });
+    }
+
+    if (updates.phone) {
+      const cleanPhone = updates.phone.trim().replace(/\D/g, '').slice(-10);
+      if (cleanPhone.length < 10) {
+        return NextResponse.json({ error: 'Valid 10-digit mobile number is mandatory (10 अंकों का मोबाइल नंबर अनिवार्य है)' }, { status: 400 });
+      }
+      const existingMembers = await getAllMembers();
+      const duplicateMember = existingMembers.find(m => m.id !== id && m.phone?.replace(/\D/g, '').slice(-10) === cleanPhone);
+      if (duplicateMember) {
+        return NextResponse.json({ 
+          error: `Mobile number (${cleanPhone}) is already registered with member "${duplicateMember.name}". (यह मोबाइल नंबर पहले से सदस्य "${duplicateMember.name}" के नाम पर पंजीकृत है।)` 
+        }, { status: 400 });
+      }
+      updates.phone = cleanPhone;
     }
 
     const updated = await updateMember(id, updates);

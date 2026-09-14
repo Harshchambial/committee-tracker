@@ -160,9 +160,17 @@ export async function getAllMembers(): Promise<Member[]> {
 }
 
 export async function addMember(memberData: Omit<Member, 'id'>): Promise<Member> {
+  const cleanPhone = memberData.phone.replace(/\D/g, '').slice(-10);
+  const currentMembers = await getAllMembers();
+  const dup = currentMembers.find(m => m.phone?.replace(/\D/g, '').slice(-10) === cleanPhone);
+  if (dup) {
+    throw new Error(`Mobile number (${cleanPhone}) is already registered with member "${dup.name}".`);
+  }
+
   const id = `mem_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const newMember: Member = { 
     ...memberData, 
+    phone: cleanPhone,
     id,
     memberType: memberData.memberType || 'CORE'
   };
@@ -211,6 +219,16 @@ export async function addMember(memberData: Omit<Member, 'id'>): Promise<Member>
 }
 
 export async function updateMember(id: string, updates: Partial<Member>): Promise<Member> {
+  if (updates.phone) {
+    const cleanPhone = updates.phone.replace(/\D/g, '').slice(-10);
+    const currentMembers = await getAllMembers();
+    const dup = currentMembers.find(m => m.id !== id && m.phone?.replace(/\D/g, '').slice(-10) === cleanPhone);
+    if (dup) {
+      throw new Error(`Mobile number (${cleanPhone}) is already registered with member "${dup.name}".`);
+    }
+    updates.phone = cleanPhone;
+  }
+
   if (isSupabaseConfigured && supabase) {
     const updatePayload: any = {};
     if (updates.name !== undefined) updatePayload.name = updates.name;

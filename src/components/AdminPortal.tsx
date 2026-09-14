@@ -24,7 +24,9 @@ import {
   HeartHandshake,
   Sparkles,
   UserCheck,
-  RefreshCw
+  RefreshCw,
+  Search,
+  Calendar
 } from 'lucide-react';
 import { EditMemberModal } from '@/components/EditMemberModal';
 import { AddPaidMemberModal } from '@/components/AddPaidMemberModal';
@@ -38,6 +40,16 @@ import {
   ExpenseCategory,
   ContributionType 
 } from '@/types';
+
+const EXPENSE_CATEGORY_NAMES: Record<ExpenseCategory, { en: string; hi: string; bg: string; text: string }> = {
+  COMMUNITY_WELFARE: { en: 'Community Welfare', hi: 'सार्वजनिक कार्य / विकास', bg: 'bg-blue-50 border-blue-200', text: 'text-blue-700' },
+  EVENT: { en: 'Event & Meeting', hi: 'बैठक एवं आयोजन', bg: 'bg-purple-50 border-purple-200', text: 'text-purple-700' },
+  CHARITY: { en: 'Charity & Donation', hi: 'दान एवं सहायता', bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700' },
+  DISBURSEMENT: { en: 'Member Loan / Disbursement', hi: 'आवंटन / ऋण', bg: 'bg-amber-50 border-amber-200', text: 'text-amber-800' },
+  ADMINISTRATIVE: { en: 'Admin & Records', hi: 'प्रशासन एवं पंजी', bg: 'bg-slate-100 border-slate-200', text: 'text-slate-700' },
+  MAINTENANCE: { en: 'Maintenance', hi: 'मरम्मत एवं रखरखाव', bg: 'bg-orange-50 border-orange-200', text: 'text-orange-700' },
+  OTHER: { en: 'Other Work', hi: 'अन्य कार्य', bg: 'bg-gray-100 border-gray-200', text: 'text-gray-700' },
+};
 
 interface AdminPortalProps {
   isAdminLoggedIn: boolean;
@@ -153,6 +165,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
   const [expenseDesc, setExpenseDesc] = useState('');
   const [expenseReceiptNote, setExpenseReceiptNote] = useState('');
+  const [expenseSearchTerm, setExpenseSearchTerm] = useState('');
 
   // Settings form state
   const [settingsCommitteeName, setSettingsCommitteeName] = useState(settings?.committeeName || '');
@@ -301,6 +314,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       return;
     }
 
+    // Duplicate Phone Check against existing members
+    const duplicateMember = members.find(m => m.phone?.replace(/\D/g, '').slice(-10) === cleanPhone);
+    if (duplicateMember) {
+      setFeedbackMessage({ 
+        type: 'error', 
+        text: isHindi 
+          ? `यह मोबाइल नंबर (${cleanPhone}) पहले से सदस्य "${duplicateMember.name}" के नाम पर पंजीकृत है। कृपया दूसरा मोबाइल नंबर दर्ज करें।` 
+          : `Mobile number (${cleanPhone}) is already registered with member "${duplicateMember.name}". Please use a unique mobile number.` 
+      });
+      setActionLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch('/api/members', {
         method: 'POST',
@@ -438,6 +464,38 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       setExpenseAmount('');
       setExpenseDesc('');
       setExpenseReceiptNote('');
+      onRefreshData();
+    } catch (err: any) {
+      setFeedbackMessage({ type: 'error', text: err.message });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Delete Expense / Public Work
+  const handleDeleteExpense = async (expenseId: string, expenseTitle: string, expenseAmount: number) => {
+    const confirmMsg = isHindi 
+      ? `क्या आप वाकई व्यय "${expenseTitle}" (₹${expenseAmount.toLocaleString('en-IN')}) को हटाना चाहते हैं? यह राशि वापस उपलब्ध कोष में जुड़ जाएगी।` 
+      : `Are you sure you want to delete expense "${expenseTitle}" (₹${expenseAmount.toLocaleString('en-IN')})? This amount will be returned to the treasury balance.`;
+    if (!confirm(confirmMsg)) {
+      return;
+    }
+    setActionLoading(true);
+    setFeedbackMessage(null);
+
+    try {
+      const res = await fetch(`/api/expenses?id=${expenseId}&adminPin=${adminPin}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete expense');
+
+      setFeedbackMessage({ 
+        type: 'success', 
+        text: isHindi 
+          ? `व्यय "${expenseTitle}" हटा दिया गया एवं ₹${expenseAmount.toLocaleString('en-IN')} कोष में वापस जोड़ दिए गए!` 
+          : `Expense "${expenseTitle}" deleted and ₹${expenseAmount.toLocaleString('en-IN')} returned to treasury!` 
+      });
       onRefreshData();
     } catch (err: any) {
       setFeedbackMessage({ type: 'error', text: err.message });
@@ -1027,103 +1085,218 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         </div>
       )}
 
-      {/* TAB 4: ADD EXPENSE */}
+      {/* TAB 4: ADD & MANAGE PUBLIC WORKS / EXPENSES */}
       {adminTab === 'EXPENSE' && (
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs max-w-xl">
-          <h3 className="font-extrabold text-slate-900 text-base mb-1">
-            Log New Fund Utilization / Expense
-          </h3>
-          <p className="text-xs text-slate-500 mb-5">
-            Record every expenditure to maintain transparency with all committee members.
-          </p>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column: Log New Expense Form */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs h-fit">
+            <h3 className="font-extrabold text-slate-900 text-base mb-1 flex items-center gap-2">
+              <ReceiptIndianRupee className="w-4 h-4 text-amber-600" />
+              <span>{isHindi ? 'नया सार्वजनिक कार्य / व्यय दर्ज करें' : 'Log New Public Work / Expense'}</span>
+            </h3>
+            <p className="text-xs text-slate-500 mb-5">
+              {isHindi ? 'सार्वजनिक पारदर्शिता हेतु हर व्यय का विवरण दर्ज करें।' : 'Record every expenditure to maintain transparency with all committee members.'}
+            </p>
 
-          <form onSubmit={handleAddExpense} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Expense Title *</label>
-              <input
-                type="text"
-                placeholder="e.g. Monthly General Meeting Snacks & Tea"
-                value={expenseTitle}
-                onChange={(e) => setExpenseTitle(e.target.value)}
-                required
-                className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
+            <form onSubmit={handleAddExpense} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Category *</label>
-                <select
-                  value={expenseCategory}
-                  onChange={(e) => setExpenseCategory(e.target.value as any)}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm"
-                >
-                  <option value="COMMUNITY_WELFARE">Community Welfare</option>
-                  <option value="EVENT">Event & Meeting</option>
-                  <option value="CHARITY">Charity & Donation</option>
-                  <option value="DISBURSEMENT">Member Loan / Disbursement</option>
-                  <option value="ADMINISTRATIVE">Admin & Stationery</option>
-                  <option value="MAINTENANCE">Maintenance</option>
-                  <option value="OTHER">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Amount (₹) *</label>
-                <input
-                  type="number"
-                  placeholder="e.g. 1500"
-                  value={expenseAmount}
-                  onChange={(e) => setExpenseAmount(e.target.value)}
-                  required
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-bold"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Date *</label>
-                <input
-                  type="date"
-                  value={expenseDate}
-                  onChange={(e) => setExpenseDate(e.target.value)}
-                  required
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Receipt / Bill Voucher</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">{isHindi ? 'कार्य / व्यय शीर्षक *' : 'Expense Title *'}</label>
                 <input
                   type="text"
-                  placeholder="e.g. Bill No. 441 / Cash memo"
-                  value={expenseReceiptNote}
-                  onChange={(e) => setExpenseReceiptNote(e.target.value)}
+                  placeholder={isHindi ? 'उदा. गली की स्ट्रीट लाइट मरम्मत, पाइपलाइन कार्य...' : 'e.g. Street Light Repair, Water Pipeline...'}
+                  value={expenseTitle}
+                  onChange={(e) => setExpenseTitle(e.target.value)}
+                  required
                   className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm"
                 />
               </div>
-            </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Description / Purpose</label>
-              <textarea
-                rows={2}
-                placeholder="Details of the expenditure for committee records..."
-                value={expenseDesc}
-                onChange={(e) => setExpenseDesc(e.target.value)}
-                className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm"
-              />
-            </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">{isHindi ? 'श्रेणी *' : 'Category *'}</label>
+                  <select
+                    value={expenseCategory}
+                    onChange={(e) => setExpenseCategory(e.target.value as any)}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm"
+                  >
+                    <option value="COMMUNITY_WELFARE">{isHindi ? 'सार्वजनिक कार्य / विकास' : 'Community Welfare'}</option>
+                    <option value="EVENT">{isHindi ? 'बैठक एवं आयोजन' : 'Event & Meeting'}</option>
+                    <option value="CHARITY">{isHindi ? 'दान एवं सहायता' : 'Charity & Donation'}</option>
+                    <option value="DISBURSEMENT">{isHindi ? 'आवंटन / ऋण' : 'Member Loan / Disbursement'}</option>
+                    <option value="ADMINISTRATIVE">{isHindi ? 'प्रशासन एवं पंजी' : 'Admin & Stationery'}</option>
+                    <option value="MAINTENANCE">{isHindi ? 'मरम्मत एवं रखरखाव' : 'Maintenance'}</option>
+                    <option value="OTHER">{isHindi ? 'अन्य कार्य' : 'Other'}</option>
+                  </select>
+                </div>
 
-            <button
-              type="submit"
-              disabled={actionLoading}
-              className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition cursor-pointer disabled:opacity-50"
-            >
-              {actionLoading ? 'Recording...' : 'Record Expense & Deduct from Treasury'}
-            </button>
-          </form>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">{isHindi ? 'राशि (₹) *' : 'Amount (₹) *'}</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 1500"
+                    value={expenseAmount}
+                    onChange={(e) => setExpenseAmount(e.target.value)}
+                    required
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">{isHindi ? 'दिनांक *' : 'Date *'}</label>
+                  <input
+                    type="date"
+                    value={expenseDate}
+                    onChange={(e) => setExpenseDate(e.target.value)}
+                    required
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">{isHindi ? 'बिल / रसीद क्रमांक' : 'Receipt / Bill Voucher'}</label>
+                  <input
+                    type="text"
+                    placeholder={isHindi ? 'उदा. बिल क्र. 441 / कैश मेमो' : 'e.g. Bill No. 441 / Cash memo'}
+                    value={expenseReceiptNote}
+                    onChange={(e) => setExpenseReceiptNote(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">{isHindi ? 'विवरण / उद्देश्य' : 'Description / Purpose'}</label>
+                <textarea
+                  rows={2}
+                  placeholder={isHindi ? 'सार्वजनिक कार्य या खर्च का विवरण...' : 'Details of the expenditure for committee records...'}
+                  value={expenseDesc}
+                  onChange={(e) => setExpenseDesc(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={actionLoading}
+                className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition cursor-pointer disabled:opacity-50"
+              >
+                {actionLoading 
+                  ? (isHindi ? 'दर्ज किया जा रहा है...' : 'Recording...') 
+                  : (isHindi ? 'व्यय दर्ज करें एवं कोष से घटाएं' : 'Record Expense & Deduct from Treasury')}
+              </button>
+            </form>
+          </div>
+
+          {/* Right Column (span 2): Directory of Recorded Public Works & Delete Option */}
+          <div className="lg:col-span-2 space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+              <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                    <span>{isHindi ? 'दर्ज सार्वजनिक कार्य एवं व्यय सूची' : 'Recorded Public Works & Expenditures'}</span>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-xs font-bold">
+                      {expenses.length}
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    {isHindi ? 'गलती से दर्ज या डमी डेटा को हटाने हेतु "हटाएं" बटन दबाएं।' : 'Click "Delete" to remove any accidental entry or dummy test data.'}
+                  </p>
+                </div>
+
+                <div className="relative w-full sm:w-64">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder={isHindi ? 'शीर्षक या विवरण खोजें...' : 'Search title, description...'}
+                    value={expenseSearchTerm}
+                    onChange={(e) => setExpenseSearchTerm(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:ring-1 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+
+              {/* Expenses List */}
+              <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
+                {(() => {
+                  const filtered = expenses.filter(exp => {
+                    const q = expenseSearchTerm.toLowerCase();
+                    return exp.title.toLowerCase().includes(q) ||
+                           exp.description.toLowerCase().includes(q) ||
+                           (exp.receiptNote && exp.receiptNote.toLowerCase().includes(q));
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="py-12 text-center text-slate-400 text-xs">
+                        {expenseSearchTerm 
+                          ? (isHindi ? 'कोई व्यय रिकॉर्ड नहीं मिला।' : 'No matching expenses found.') 
+                          : (isHindi ? 'अभी कोई सार्वजनिक कार्य या व्यय दर्ज नहीं है।' : 'No public works or expenses recorded yet.')}
+                      </div>
+                    );
+                  }
+
+                  return filtered.map(exp => {
+                    const catConf = EXPENSE_CATEGORY_NAMES[exp.category] || EXPENSE_CATEGORY_NAMES.OTHER;
+                    return (
+                      <div key={exp.id} className="p-4 hover:bg-slate-50/70 transition flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                        <div className="space-y-1.5 flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${catConf.bg} ${catConf.text}`}>
+                              {isHindi ? catConf.hi : catConf.en}
+                            </span>
+                            <span className="text-xs text-slate-400 flex items-center gap-1 font-mono">
+                              <Calendar className="w-3 h-3" />
+                              {new Date(exp.date).toLocaleDateString('en-IN', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric'
+                              })}
+                            </span>
+                          </div>
+
+                          <h4 className="text-sm font-bold text-slate-900 leading-snug">
+                            {exp.title}
+                          </h4>
+
+                          {exp.description && (
+                            <p className="text-xs text-slate-600 line-clamp-2">
+                              {exp.description}
+                            </p>
+                          )}
+
+                          {exp.receiptNote && (
+                            <div className="text-[11px] text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded">
+                              🧾 {exp.receiptNote}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 shrink-0">
+                          <div className="text-base sm:text-lg font-black text-amber-700 flex items-center">
+                            <IndianRupee className="w-4 h-4 stroke-[2.5]" />
+                            {exp.amount.toLocaleString('en-IN')}
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={actionLoading}
+                            onClick={() => handleDeleteExpense(exp.id, exp.title, exp.amount)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 font-bold text-xs transition cursor-pointer shadow-2xs"
+                            title={isHindi ? 'इस कार्य/व्यय रिकॉर्ड को हटाएं' : 'Delete this public work record'}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>{isHindi ? 'हटाएं' : 'Delete'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1724,6 +1897,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         member={selectedMemberToEdit}
         adminPin={adminPin}
         onMemberUpdated={onRefreshData}
+        existingMembers={members}
       />
 
       {/* Quick Add Paid Member Modal */}
@@ -1734,6 +1908,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         settings={settings}
         onMemberAdded={onRefreshData}
         onViewReceipt={onViewReceipt}
+        existingMembers={members}
       />
     </div>
   );

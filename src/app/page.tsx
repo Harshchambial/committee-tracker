@@ -194,18 +194,39 @@ export default function Home() {
   };
 
   const handleDeleteExpense = async (expenseId: string) => {
-    if (currentUser?.role !== 'ADMIN' || !adminPin) return;
-    if (!confirm('Are you sure you want to delete this expense record?')) return;
+    let pinToUse = adminPin;
+    if (!pinToUse) {
+      const enteredPin = prompt(isHindi ? 'सार्वजनिक कार्य / व्यय हटाने हेतु कृपया व्यवस्थापक पिन (Admin PIN) दर्ज करें:' : 'Please enter Admin PIN to delete this expense record:');
+      if (!enteredPin || !enteredPin.trim()) return;
+      pinToUse = enteredPin.trim();
+    }
+
+    const exp = expenses.find(e => e.id === expenseId);
+    const expTitle = exp ? `"${exp.title}" (₹${exp.amount.toLocaleString('en-IN')})` : 'this record';
+    const confirmMsg = isHindi
+      ? `क्या आप वाकई व्यय ${expTitle} को हटाना चाहते हैं? यह राशि वापस उपलब्ध कोष में जुड़ जाएगी।`
+      : `Are you sure you want to delete expense ${expTitle}? This amount will be returned to the treasury balance.`;
+
+    if (!confirm(confirmMsg)) return;
 
     try {
-      const res = await fetch(`/api/expenses?id=${expenseId}&adminPin=${adminPin}`, {
+      const res = await fetch(`/api/expenses?id=${expenseId}&adminPin=${pinToUse}`, {
         method: 'DELETE'
       });
-      if (res.ok) {
-        fetchData();
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Failed to delete expense. Check Admin PIN.');
+        return;
       }
-    } catch (e) {
+      if (!adminPin && pinToUse) {
+        setAdminPin(pinToUse);
+        localStorage.setItem('samiti_admin_pin', pinToUse);
+      }
+      fetchData(true);
+      alert(isHindi ? 'व्यय रिकॉर्ड सफलतापूर्वक हटा दिया गया एवं कोष अपडेट हो गया।' : 'Expense record deleted successfully and treasury updated.');
+    } catch (e: any) {
       console.error('Delete expense error:', e);
+      alert(e.message || 'Error deleting expense');
     }
   };
 
@@ -413,6 +434,7 @@ export default function Home() {
         settings={settings}
         onMemberAdded={fetchData}
         onViewReceipt={(payment) => setReceiptPayment(payment)}
+        existingMembers={members}
       />
     </div>
   );
