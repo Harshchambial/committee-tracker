@@ -26,7 +26,8 @@ import {
   UserCheck,
   RefreshCw,
   Search,
-  Calendar
+  Calendar,
+  Banknote
 } from 'lucide-react';
 import { EditMemberModal } from '@/components/EditMemberModal';
 import { AddPaidMemberModal } from '@/components/AddPaidMemberModal';
@@ -793,9 +794,16 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                      <span className="font-mono bg-amber-50 text-amber-900 px-2 py-0.5 rounded-md font-bold border border-amber-200">
-                        UTR: {payment.utrNumber}
-                      </span>
+                      {payment.method === 'CASH' ? (
+                        <span className="bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-md font-extrabold text-[11px] border border-emerald-300 inline-flex items-center gap-1">
+                          <Banknote className="w-3.5 h-3.5" />
+                          <span>नकद (Cash in Hand)</span>
+                        </span>
+                      ) : (
+                        <span className="font-mono bg-amber-50 text-amber-900 px-2 py-0.5 rounded-md font-bold border border-amber-200">
+                          UTR: {payment.utrNumber}
+                        </span>
+                      )}
                       <span>Submitted: {new Date(payment.paidAt).toLocaleDateString()} at {new Date(payment.paidAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
 
@@ -810,20 +818,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     <button
                       onClick={() => handleVerifyPayment(payment.id, 'APPROVE')}
                       disabled={actionLoading}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition cursor-pointer active:scale-95"
                     >
                       <CheckCircle2 className="w-4 h-4" />
                       Approve & Credit
                     </button>
                     <button
                       onClick={() => {
-                        const reason = prompt('Enter rejection reason (or leave empty):', 'UTR not found in bank statement');
+                        const defaultReason = payment.method === 'CASH' ? 'Cash payment not received in hand' : 'UTR not found in bank statement';
+                        const reason = prompt('Enter rejection reason (or leave empty):', defaultReason);
                         if (reason !== null) {
                           handleVerifyPayment(payment.id, 'REJECT');
                         }
                       }}
                       disabled={actionLoading}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-600 font-semibold text-xs border border-slate-200 transition cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-600 font-semibold text-xs border border-slate-200 transition cursor-pointer active:scale-95"
                     >
                       <XCircle className="w-4 h-4" />
                       Reject

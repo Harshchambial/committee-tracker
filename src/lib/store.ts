@@ -20,11 +20,12 @@ const DEFAULT_SETTINGS: CommitteeSettings = {
   committeeName: 'Vikas Sahayog Samiti',
   tagline: 'Building Community Trust & Shared Prosperity',
   monthlyAmount: 1000,
-  upiId: 'samiti@upi',
+  upiId: 'singhn1375@oksbi',
   payeeName: 'Narinder Singh',
   adminName: 'Narinder Singh',
-  adminPhone: '9876543210',
+  adminPhone: '9816024227',
   adminPin: '1234',
+  customQrUrl: '/qr-code.png',
   currency: 'INR',
   startMonth: 1,
   startYear: 2026,
@@ -347,27 +348,37 @@ export async function submitPayment(data: {
   month?: number;
   year?: number;
   amount: number;
-  utrNumber: string;
+  utrNumber?: string;
+  paymentMethod?: PaymentMethod;
   contributionType?: ContributionType;
   purpose?: string;
   notes?: string;
 }): Promise<PaymentRecord> {
-  const cleanUtr = data.utrNumber.trim().replace(/\s+/g, '');
-  if (!cleanUtr || cleanUtr.length < 6) {
-    throw new Error('Please enter a valid 12-digit UPI Reference / UTR Number.');
+  const method: PaymentMethod = data.paymentMethod || 'UPI_QR';
+  const isCash = method === 'CASH';
+
+  let cleanUtr = '';
+  if (isCash) {
+    cleanUtr = data.utrNumber ? data.utrNumber.trim() : `CASH-${Date.now().toString().slice(-6)}`;
+  } else {
+    cleanUtr = (data.utrNumber || '').trim().replace(/\s+/g, '');
+    if (!cleanUtr || cleanUtr.length < 6) {
+      throw new Error('Please enter a valid 12-digit UPI Reference / UTR Number.');
+    }
+
+    const payments = await getAllPayments();
+    const existingUtr = payments.find(p => 
+      p.utrNumber && 
+      p.utrNumber.toLowerCase() === cleanUtr.toLowerCase() && 
+      p.status !== 'REJECTED'
+    );
+
+    if (existingUtr) {
+      throw new Error(`This UTR number (${cleanUtr}) has already been recorded for ${existingUtr.memberName}.`);
+    }
   }
 
   const payments = await getAllPayments();
-  const existingUtr = payments.find(p => 
-    p.utrNumber && 
-    p.utrNumber.toLowerCase() === cleanUtr.toLowerCase() && 
-    p.status !== 'REJECTED'
-  );
-
-  if (existingUtr) {
-    throw new Error(`This UTR number (${cleanUtr}) has already been recorded for ${existingUtr.memberName}.`);
-  }
-
   const isPublicSeva = data.contributionType === 'PUBLIC_SEVA';
   const members = await getAllMembers();
   let member = data.memberId ? members.find(m => m.id === data.memberId) : undefined;
@@ -418,13 +429,13 @@ export async function submitPayment(data: {
     year,
     amount: data.amount || (isPublicSeva ? 500 : settings.monthlyAmount),
     utrNumber: cleanUtr,
-    method: 'UPI_QR',
+    method,
     status: 'PENDING_APPROVAL',
     contributionType: isPublicSeva ? 'PUBLIC_SEVA' : 'CORE_MONTHLY',
     purpose: data.purpose || (isPublicSeva ? 'Community Welfare / Public Seva' : undefined),
     contributorPhone: data.contributorPhone,
     paidAt: new Date().toISOString(),
-    notes: data.notes
+    notes: data.notes || (isCash ? 'Cash handed over to organizer' : undefined)
   };
 
   if (isSupabaseConfigured && supabase) {
@@ -743,6 +754,8 @@ export async function getSettings(): Promise<CommitteeSettings> {
         let adminName = data.admin_name;
         let adminPhone = data.admin_phone;
         let payeeName = data.payee_name;
+        let upiId = data.upi_id;
+        let customQrUrl = data.custom_qr_url || '/qr-code.png';
 
         if (!adminName || adminName.toLowerCase().includes('rajesh sharma')) {
           adminName = 'Narinder Singh';
@@ -754,6 +767,20 @@ export async function getSettings(): Promise<CommitteeSettings> {
           payeeName = 'Narinder Singh';
           if (isSupabaseConfigured && supabase) {
             supabase.from('committee_settings').update({ payee_name: 'Narinder Singh' }).eq('id', data.id || 'default').then();
+          }
+        }
+
+        if (!adminPhone || adminPhone === '9876543210') {
+          adminPhone = '9816024227';
+          if (isSupabaseConfigured && supabase) {
+            supabase.from('committee_settings').update({ admin_phone: '9816024227' }).eq('id', data.id || 'default').then();
+          }
+        }
+
+        if (!upiId || upiId === 'samiti@upi') {
+          upiId = 'singhn1375@oksbi';
+          if (isSupabaseConfigured && supabase) {
+            supabase.from('committee_settings').update({ upi_id: 'singhn1375@oksbi' }).eq('id', data.id || 'default').then();
           }
         }
 
@@ -770,11 +797,12 @@ export async function getSettings(): Promise<CommitteeSettings> {
           committeeName: data.committee_name || DEFAULT_SETTINGS.committeeName,
           tagline: data.tagline || DEFAULT_SETTINGS.tagline,
           monthlyAmount: Number(data.monthly_amount) || 1000,
-          upiId: data.upi_id || DEFAULT_SETTINGS.upiId,
+          upiId: upiId || DEFAULT_SETTINGS.upiId,
           payeeName: payeeName || DEFAULT_SETTINGS.payeeName,
           adminName: adminName || DEFAULT_SETTINGS.adminName,
           adminPhone: adminPhone || DEFAULT_SETTINGS.adminPhone,
           adminPin: data.admin_pin || '1234',
+          customQrUrl: customQrUrl || DEFAULT_SETTINGS.customQrUrl,
           currency: data.currency || 'INR',
           startMonth: data.start_month || 1,
           startYear: data.start_year || 2026,
@@ -797,6 +825,8 @@ export async function getSettings(): Promise<CommitteeSettings> {
   return {
     ...DEFAULT_SETTINGS,
     ...db.settings,
+    upiId: (!db.settings.upiId || db.settings.upiId === 'samiti@upi') ? 'singhn1375@oksbi' : db.settings.upiId,
+    customQrUrl: db.settings.customQrUrl || '/qr-code.png',
     adminName: fallbackAdminName,
     payeeName: fallbackPayeeName,
     adminPhone: db.settings.adminPhone || adminMem?.phone || DEFAULT_SETTINGS.adminPhone

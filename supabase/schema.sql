@@ -9,12 +9,13 @@ CREATE TABLE IF NOT EXISTS committee_settings (
   committee_name TEXT NOT NULL DEFAULT 'Vikas Sahayog Samiti',
   tagline TEXT DEFAULT 'Building Community Trust & Shared Prosperity',
   monthly_amount NUMERIC NOT NULL DEFAULT 1000,
-  upi_id TEXT NOT NULL DEFAULT 'samiti@upi',
+  upi_id TEXT NOT NULL DEFAULT 'singhn1375@oksbi',
   payee_name TEXT NOT NULL DEFAULT 'Narinder Singh',
+  custom_qr_url TEXT DEFAULT '/qr-code.png',
   admin_pin TEXT NOT NULL DEFAULT '1234',
   currency TEXT DEFAULT 'INR',
   admin_name TEXT DEFAULT 'Narinder Singh',
-  admin_phone TEXT DEFAULT '9876543210',
+  admin_phone TEXT DEFAULT '9816024227',
   start_month INT DEFAULT 1,
   start_year INT DEFAULT 2026,
   reminder_template_hindi TEXT,
@@ -24,14 +25,17 @@ CREATE TABLE IF NOT EXISTS committee_settings (
 
 -- Migration support for existing tables:
 ALTER TABLE committee_settings ADD COLUMN IF NOT EXISTS admin_name TEXT DEFAULT 'Narinder Singh';
-ALTER TABLE committee_settings ADD COLUMN IF NOT EXISTS admin_phone TEXT DEFAULT '9876543210';
+ALTER TABLE committee_settings ADD COLUMN IF NOT EXISTS admin_phone TEXT DEFAULT '9816024227';
+ALTER TABLE committee_settings ADD COLUMN IF NOT EXISTS custom_qr_url TEXT DEFAULT '/qr-code.png';
 
 -- Upsert Default Settings for Narinder Singh
-INSERT INTO committee_settings (id, committee_name, tagline, monthly_amount, upi_id, payee_name, admin_name, admin_phone, admin_pin)
-VALUES ('default', 'Vikas Sahayog Samiti', 'Building Community Trust & Shared Prosperity', 1000, 'samiti@upi', 'Narinder Singh', 'Narinder Singh', '9876543210', '1234')
+INSERT INTO committee_settings (id, committee_name, tagline, monthly_amount, upi_id, payee_name, admin_name, admin_phone, admin_pin, custom_qr_url)
+VALUES ('default', 'Vikas Sahayog Samiti', 'Building Community Trust & Shared Prosperity', 1000, 'singhn1375@oksbi', 'Narinder Singh', 'Narinder Singh', '9816024227', '1234', '/qr-code.png')
 ON CONFLICT (id) DO UPDATE SET 
   admin_name = 'Narinder Singh',
-  payee_name = 'Narinder Singh';
+  payee_name = 'Narinder Singh',
+  upi_id = 'singhn1375@oksbi',
+  custom_qr_url = '/qr-code.png';
 
 -- 2. Create Members Table
 CREATE TABLE IF NOT EXISTS members (

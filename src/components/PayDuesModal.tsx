@@ -16,7 +16,8 @@ import {
   HeartHandshake,
   UserCheck,
   Tag,
-  Sparkles
+  Sparkles,
+  Banknote
 } from 'lucide-react';
 import { Member, CommitteeSettings, ContributionType } from '@/types';
 import { useLanguage } from '@/context/LanguageContext';
@@ -74,6 +75,8 @@ export const PayDuesModal: React.FC<PayDuesModalProps> = ({
   const [customAmount, setCustomAmount] = useState<string>('500');
   const [purpose, setPurpose] = useState<string>('');
 
+  const [paymentMethod, setPaymentMethod] = useState<'UPI_QR' | 'CASH'>('UPI_QR');
+  const [qrImageError, setQrImageError] = useState(false);
   const [utrNumber, setUtrNumber] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   
@@ -91,6 +94,8 @@ export const PayDuesModal: React.FC<PayDuesModalProps> = ({
     if (isOpen && !prevIsOpenRef.current) {
       const initType = initialType || 'CORE_MONTHLY';
       setContributionType(initType);
+      setPaymentMethod('UPI_QR');
+      setQrImageError(false);
 
       if (initialMemberId) {
         setSelectedMemberId(initialMemberId);
@@ -130,7 +135,7 @@ export const PayDuesModal: React.FC<PayDuesModalProps> = ({
   const coreAmount = settings?.monthlyAmount || 1000;
   const currentAmount = isCore ? coreAmount : (parseFloat(customAmount) || 0);
 
-  const upiId = settings?.upiId || 'samiti@upi';
+  const upiId = settings?.upiId || 'singhn1375@oksbi';
   const payeeName = settings?.payeeName || settings?.committeeName || 'Narinder Singh';
   const monthName = getMonthName(selectedMonth);
 
@@ -151,10 +156,15 @@ export const PayDuesModal: React.FC<PayDuesModalProps> = ({
     e.preventDefault();
     setErrorMessage(null);
 
-    const cleanUtr = utrNumber.trim().replace(/\s+/g, '');
-    if (!cleanUtr || cleanUtr.length < 6) {
-      setErrorMessage(isHindi ? 'कृपया वैध 12-अंकों का UPI UTR / Reference नंबर दर्ज करें।' : 'Please enter a valid 12-digit UPI Reference / UTR Number.');
-      return;
+    const isCash = paymentMethod === 'CASH';
+    let cleanUtr = '';
+
+    if (!isCash) {
+      cleanUtr = utrNumber.trim().replace(/\s+/g, '');
+      if (!cleanUtr || cleanUtr.length < 6) {
+        setErrorMessage(isHindi ? 'कृपया वैध 12-अंकों का UPI UTR / Reference नंबर दर्ज करें।' : 'Please enter a valid 12-digit UPI Reference / UTR Number.');
+        return;
+      }
     }
 
     if (isCore) {
@@ -177,11 +187,14 @@ export const PayDuesModal: React.FC<PayDuesModalProps> = ({
     try {
       const payload: any = {
         amount: currentAmount,
-        utrNumber: cleanUtr,
-        paymentMethod: 'UPI_QR',
+        paymentMethod,
         notes: notes.trim(),
         contributionType
       };
+
+      if (!isCash) {
+        payload.utrNumber = cleanUtr;
+      }
 
       if (isCore) {
         payload.memberId = selectedMemberId;
@@ -203,7 +216,11 @@ export const PayDuesModal: React.FC<PayDuesModalProps> = ({
       if (!res.ok) throw new Error(data.error || 'Failed to submit payment proof');
 
       confetti({ particleCount: 50, spread: 60 });
-      setSuccessMessage(isHindi ? 'भुगतान रसीद सबमिट हो गई! व्यवस्थापक जल्द सत्यापित करेंगे।' : 'Payment proof submitted! Admin will verify shortly.');
+      setSuccessMessage(
+        isCash
+          ? (isHindi ? 'नकद भुगतान विवरण सबमिट हो गया! व्यवस्थापक सत्यापन के बाद यह जुड़ जाएगा।' : 'Cash payment submitted! Organizer will verify and credit it shortly.')
+          : (isHindi ? 'भुगतान रसीद सबमिट हो गई! व्यवस्थापक जल्द सत्यापित करेंगे।' : 'Payment proof submitted! Admin will verify shortly.')
+      );
       
       setTimeout(() => {
         onPaymentSuccess();
@@ -443,81 +460,174 @@ export const PayDuesModal: React.FC<PayDuesModalProps> = ({
             </div>
           )}
 
-          {/* Live Dynamic UPI QR & Payment Action Box */}
-          <div className="bg-gradient-to-b from-slate-50 to-slate-100/70 p-4 rounded-2xl border border-slate-200 text-center space-y-3">
-            <div className="flex flex-col items-center justify-center">
-              <div className="p-3 bg-white rounded-2xl shadow-sm border border-slate-200 inline-block">
-                <QRCodeSVG
-                  value={upiUri}
-                  size={160}
-                  level="M"
-                  includeMargin={false}
+          {/* Payment Method Switcher (Online UPI/QR vs Cash in Hand) */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setPaymentMethod('UPI_QR')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-bold text-xs transition cursor-pointer active:scale-95 ${
+                paymentMethod === 'UPI_QR'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+              <span>{isHindi ? 'ऑनलाइन UPI / QR' : 'Online UPI / QR'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPaymentMethod('CASH')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-bold text-xs transition cursor-pointer active:scale-95 ${
+                paymentMethod === 'CASH'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Banknote className="w-3.5 h-3.5" />
+              <span>{isHindi ? 'नकद भुगतान (Cash)' : 'Cash in Hand'}</span>
+            </button>
+          </div>
+
+          {/* PAYMENT MODE 1: Online UPI & QR */}
+          {paymentMethod === 'UPI_QR' ? (
+            <>
+              {/* Live Dynamic UPI QR & Payment Action Box */}
+              <div className="bg-gradient-to-b from-slate-50 to-slate-100/70 p-4 rounded-2xl border border-slate-200 text-center space-y-3">
+                <div className="flex flex-col items-center justify-center">
+                  <div className="p-2.5 bg-white rounded-2xl shadow-sm border border-slate-200 inline-block overflow-hidden">
+                    {!qrImageError ? (
+                      <img
+                        src={settings?.customQrUrl || '/qr-code.png'}
+                        alt="UPI QR Code"
+                        className="w-44 h-44 sm:w-48 sm:h-48 object-contain rounded-xl"
+                        onError={() => setQrImageError(true)}
+                      />
+                    ) : (
+                      <QRCodeSVG
+                        value={upiUri}
+                        size={160}
+                        level="M"
+                        includeMargin={false}
+                      />
+                    )}
+                  </div>
+                  <p className="text-[11px] font-bold text-slate-600 mt-2">
+                    {t('scanQrToPay')} ({payeeName})
+                  </p>
+                  <div className="text-lg sm:text-xl font-black text-slate-900 mt-0.5">
+                    <span className="text-sm font-bold mr-0.5">₹</span>
+                    {currentAmount.toLocaleString('en-IN')}
+                  </div>
+                </div>
+
+                {/* Direct Mobile UPI Intent Button */}
+                <a
+                  href={upiUri}
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition active:scale-98"
+                >
+                  <Smartphone className="w-4 h-4" />
+                  <span>{t('openUpiApp')}</span>
+                </a>
+
+                {/* UPI ID Copy Bar */}
+                <div className="flex items-center justify-between bg-white px-3 py-2 rounded-xl border border-slate-200 text-xs">
+                  <span className="font-mono text-slate-600 font-bold truncate max-w-[210px]">{upiId}</span>
+                  <button
+                    type="button"
+                    onClick={handleCopyUpi}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200 cursor-pointer"
+                  >
+                    {copiedUpi ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedUpi ? t('copied') : t('copyUpiId')}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 12-Digit UTR Input */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                    {t('enterUtrLabel')}
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowUtrHelp(!showUtrHelp)}
+                    className="text-[10px] text-amber-700 hover:underline flex items-center gap-1 cursor-pointer font-bold"
+                  >
+                    <HelpCircle className="w-3 h-3" />
+                    <span>{isHindi ? 'UTR कहां मिलेगा?' : 'Where is UTR?'}</span>
+                  </button>
+                </div>
+
+                <input
+                  type="text"
+                  placeholder="e.g. 605192847291"
+                  value={utrNumber}
+                  onChange={(e) => setUtrNumber(e.target.value.replace(/[^0-9a-zA-Z]/g, ''))}
+                  maxLength={16}
+                  required
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono font-bold text-sm tracking-widest text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                />
+
+                {showUtrHelp && (
+                  <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900 leading-relaxed">
+                    {t('utrHelpText')}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            /* PAYMENT MODE 2: Cash in Hand */
+            <div className="bg-gradient-to-br from-emerald-50 via-teal-50/50 to-emerald-100/40 p-4 sm:p-5 rounded-2xl border-2 border-emerald-300 shadow-2xs space-y-3.5 text-center">
+              <div className="w-12 h-12 mx-auto rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/20">
+                <Banknote className="w-6 h-6" />
+              </div>
+
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-extrabold border border-emerald-300 mb-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>{isHindi ? 'समिति व्यवस्थापक को नकद' : 'Direct Cash Handover'}</span>
+                </div>
+                <h3 className="text-base font-black text-slate-900">
+                  {isHindi ? 'नकद भुगतान (Cash in Hand)' : 'Cash in Hand Payment'}
+                </h3>
+                <div className="text-2xl font-black text-emerald-700 mt-1">
+                  ₹{currentAmount.toLocaleString('en-IN')}
+                </div>
+              </div>
+
+              <div className="text-left bg-white/95 backdrop-blur-xs p-3.5 rounded-xl border border-emerald-200/80 text-xs space-y-2 text-slate-700 shadow-2xs">
+                <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+                  <span className="font-bold text-slate-600">{isHindi ? 'समिति व्यवस्थापक:' : 'Organizer:'}</span>
+                  <span className="font-black text-slate-900">{settings?.adminName || 'Narinder Singh'}</span>
+                </div>
+                {settings?.adminPhone && (
+                  <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+                    <span className="font-bold text-slate-600">{isHindi ? 'संपर्क नंबर:' : 'Contact:'}</span>
+                    <span className="font-mono font-bold text-slate-900">{settings.adminPhone}</span>
+                  </div>
+                )}
+                <p className="text-[11px] text-slate-600 leading-relaxed pt-0.5">
+                  {isHindi 
+                    ? 'ℹ️ आपने यह नकद राशि सीधे समिति व्यवस्थापक को सौंपी है। आपके सबमिट करने के बाद व्यवस्थापक अपने पोर्टल से इसे स्वीकृत (Verify) करेंगे, जिसके बाद यह तुरंत आपके नाम के आगे "Paid" दिखाई देगा।'
+                    : 'ℹ️ Hand over this cash directly to the committee organizer. After you submit, the organizer will verify and credit it in the treasury and ledger.'}
+                </p>
+              </div>
+
+              <div className="text-left space-y-1">
+                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                  {isHindi ? 'नकद देने की तारीख व विवरण (वैकल्पिक)' : 'Handover Notes / Date (Optional)'}
+                </label>
+                <input
+                  type="text"
+                  placeholder={isHindi ? 'उदा. 14 सितम्बर को नकद ₹1000 दिए' : 'e.g. Handed Rs 1000 cash on 14th Sep'}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-medium text-xs text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                 />
               </div>
-              <p className="text-[11px] font-bold text-slate-600 mt-2">
-                {t('scanQrToPay')}
-              </p>
-              <div className="text-lg sm:text-xl font-black text-slate-900 mt-0.5">
-                <span className="text-sm font-bold mr-0.5">₹</span>
-                {currentAmount.toLocaleString('en-IN')}
-              </div>
             </div>
-
-            {/* Direct Mobile UPI Intent Button */}
-            <a
-              href={upiUri}
-              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition active:scale-98"
-            >
-              <Smartphone className="w-4 h-4" />
-              <span>{t('openUpiApp')}</span>
-            </a>
-
-            {/* UPI ID Copy Bar */}
-            <div className="flex items-center justify-between bg-white px-3 py-2 rounded-xl border border-slate-200 text-xs">
-              <span className="font-mono text-slate-600 font-bold truncate max-w-[210px]">{upiId}</span>
-              <button
-                type="button"
-                onClick={handleCopyUpi}
-                className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200 cursor-pointer"
-              >
-                {copiedUpi ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                <span>{copiedUpi ? t('copied') : t('copyUpiId')}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* 12-Digit UTR Input */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                {t('enterUtrLabel')}
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowUtrHelp(!showUtrHelp)}
-                className="text-[10px] text-amber-700 hover:underline flex items-center gap-1 cursor-pointer font-bold"
-              >
-                <HelpCircle className="w-3 h-3" />
-                <span>{isHindi ? 'UTR कहां मिलेगा?' : 'Where is UTR?'}</span>
-              </button>
-            </div>
-
-            <input
-              type="text"
-              placeholder="e.g. 605192847291"
-              value={utrNumber}
-              onChange={(e) => setUtrNumber(e.target.value.replace(/[^0-9a-zA-Z]/g, ''))}
-              maxLength={16}
-              required
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono font-bold text-sm tracking-widest text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-            />
-
-            {showUtrHelp && (
-              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900 leading-relaxed">
-                {t('utrHelpText')}
-              </div>
-            )}
-          </div>
+          )}
 
           {/* Error & Success Messages */}
           {errorMessage && (
@@ -546,9 +656,13 @@ export const PayDuesModal: React.FC<PayDuesModalProps> = ({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full sm:w-2/3 py-3.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs sm:text-sm shadow-lg transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full sm:w-2/3 py-3.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs sm:text-sm shadow-lg transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 active:scale-98"
             >
-              {isSubmitting ? t('submitting') : t('btnSubmitProof')}
+              {isSubmitting 
+                ? t('submitting') 
+                : (paymentMethod === 'CASH' 
+                    ? (isHindi ? 'नकद भुगतान सबमिट करें' : 'Submit Cash Handover') 
+                    : t('btnSubmitProof'))}
             </button>
           </div>
         </form>
