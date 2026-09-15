@@ -262,12 +262,38 @@ export async function updateMember(id: string, updates: Partial<Member>): Promis
         throw new Error(`Database error updating member: ${error.message}`);
       }
     }
+
+    // Cascade name or phone changes to all past and future payments for this member
+    if (updates.name || updates.phone) {
+      const paymentUpdates: any = {};
+      if (updates.name) paymentUpdates.member_name = updates.name.trim();
+      if (updates.phone) paymentUpdates.contributor_phone = updates.phone.trim();
+      try {
+        await supabase
+          .from('payments')
+          .update(paymentUpdates)
+          .eq('member_id', id);
+      } catch (payCascadeErr) {
+        console.warn('Supabase cascade payment update warning:', payCascadeErr);
+      }
+    }
   }
 
   const db = getDatabase();
   const index = db.members.findIndex(m => m.id === id);
   if (index >= 0) {
     db.members[index] = { ...db.members[index], ...updates };
+  }
+  // Cascade name or phone changes to local database payments
+  if (updates.name || updates.phone) {
+    db.payments.forEach(p => {
+      if (p.memberId === id) {
+        if (updates.name) p.memberName = updates.name.trim();
+        if (updates.phone) p.contributorPhone = updates.phone.trim();
+      }
+    });
+  }
+  if (index >= 0) {
     saveDatabase(db);
     return db.members[index];
   }
@@ -1350,12 +1376,55 @@ export async function resetToFreshStart(providedPin: string): Promise<void> {
 }
 
 export async function getFullCommitteeSync(year: number = new Date().getFullYear()) {
-  const [settings, members, payments, expenses] = await Promise.all([
+  const [settings, members, rawPayments, expenses] = await Promise.all([
     getSettings(),
     getAllMembers(),
     getAllPayments(),
     getAllExpenses()
   ]);
+
+  // Build member lookup maps for dynamic normalization
+  const memberById = new Map(members.map(m => [m.id, m]));
+  const memberByPhone = new Map(members.map(m => [m.phone?.replace(/\D/g, '').slice(-10), m]));
+
+  // Dynamically resolve payment memberName and contributorPhone from current members
+  const payments: PaymentRecord[] = rawPayments.map(p => {
+    let matched = p.memberId ? memberById.get(p.memberId) : undefined;
+    if (!matched && p.contributorPhone) {
+      const cleanP = p.contributorPhone.replace(/\D/g, '').slice(-10);
+      matched = memberByPhone.get(cleanP);
+    }
+    if (matched) {
+      return {
+        ...p,
+        memberName: matched.name,
+        contributorPhone: matched.phone
+      };
+    }
+    return p;
+  });
+
+  // Auto-heal any stale member_name in Supabase in background
+  const sbClient = supabase;
+  if (isSupabaseConfigured && sbClient) {
+    const outdatedInDb = rawPayments.filter(p => {
+      if (!p.memberId || !memberById.has(p.memberId)) return false;
+      const mem = memberById.get(p.memberId)!;
+      return mem.name && mem.name !== p.memberName;
+    });
+
+    if (outdatedInDb.length > 0) {
+      Promise.allSettled(
+        outdatedInDb.map(p => {
+          const mem = memberById.get(p.memberId!)!;
+          return sbClient
+            .from('payments')
+            .update({ member_name: mem.name, contributor_phone: mem.phone })
+            .eq('id', p.id);
+        })
+      ).catch(e => console.warn('Background payment name auto-heal warning:', e));
+    }
+  }
 
   const now = new Date();
   const currentMonth = now.getMonth() + 1;

@@ -11,19 +11,21 @@ import {
   ShieldCheck,
   HeartHandshake
 } from 'lucide-react';
-import { PaymentRecord, CommitteeSettings } from '@/types';
+import { PaymentRecord, CommitteeSettings, Member } from '@/types';
 import { useLanguage } from '@/context/LanguageContext';
 
 interface ReceiptModalProps {
   payment: PaymentRecord | null;
   settings: CommitteeSettings | null;
   onClose: () => void;
+  members?: Member[];
 }
 
 export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   payment,
   settings,
-  onClose
+  onClose,
+  members
 }) => {
   const { t, isHindi, getMonthName } = useLanguage();
 
@@ -47,6 +49,12 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
     : 'Narinder Singh';
   const receiptNumber = `REC-${payment.year}-${String(payment.month).padStart(2, '0')}-${payment.id.slice(-5).toUpperCase()}`;
 
+  const currentMember = members?.find(m => 
+    (payment.memberId && m.id === payment.memberId) || 
+    (payment.contributorPhone && m.phone?.replace(/\D/g, '').slice(-10) === payment.contributorPhone.replace(/\D/g, '').slice(-10))
+  );
+  const contributorName = currentMember?.name || payment.memberName;
+
   const handlePrint = () => {
     window.print();
   };
@@ -55,7 +63,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
     const text = encodeURIComponent(
       `🧾 *${committeeName} - ${isPublic ? 'Jan Sahayog / Donation Receipt' : 'Monthly Payment Receipt'}*\n\n` +
       `Receipt No: ${receiptNumber}\n` +
-      `Contributor: ${payment.memberName}\n` +
+      `Contributor: ${contributorName}\n` +
       (isPublic && payment.purpose ? `Cause: ${payment.purpose}\n` : `Month: ${monthName} ${payment.year}\n`) +
       `Amount: ₹${payment.amount.toLocaleString('en-IN')}\n` +
       `Status: VERIFIED ✓\n` +
@@ -124,7 +132,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
 
             <div className="flex justify-between py-1 border-b border-dashed border-slate-200">
               <span className="text-slate-500 font-medium">{t('receivedFrom')}</span>
-              <span className="font-bold text-slate-900">{payment.memberName}</span>
+              <span className="font-bold text-slate-900">{contributorName}</span>
             </div>
 
             {isPublic ? (

@@ -412,6 +412,7 @@ export default function Home() {
       <ReceiptModal
         payment={receiptPayment}
         settings={settings}
+        members={members}
         onClose={() => setReceiptPayment(null)}
       />
 
