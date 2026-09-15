@@ -962,7 +962,10 @@ export async function getAllExpenses(): Promise<ExpenseRecord[]> {
           date: e.date,
           description: e.description || '',
           recordedBy: e.recorded_by || 'Admin',
-          receiptNote: e.receipt_note || undefined
+          receiptNote: e.receipt_note || undefined,
+          images: Array.isArray(e.images) ? e.images : [],
+          status: e.status || 'COMPLETED',
+          location: e.location || undefined
         }));
       }
     } catch (e) {
@@ -970,17 +973,24 @@ export async function getAllExpenses(): Promise<ExpenseRecord[]> {
     }
   }
   const db = getDatabase();
-  return db.expenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  return db.expenses.map(e => ({
+    ...e,
+    images: e.images || [],
+    status: e.status || 'COMPLETED'
+  })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
 export async function addExpense(expenseData: Omit<ExpenseRecord, 'id'>): Promise<ExpenseRecord> {
   const newExpense: ExpenseRecord = {
     ...expenseData,
-    id: `exp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+    id: `exp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    images: expenseData.images || [],
+    status: expenseData.status || 'COMPLETED',
+    location: expenseData.location || undefined
   };
 
   if (isSupabaseConfigured && supabase) {
-    const { error } = await supabase.from('expenses').insert({
+    const insertPayload: any = {
       id: newExpense.id,
       title: newExpense.title,
       category: newExpense.category,
@@ -988,13 +998,29 @@ export async function addExpense(expenseData: Omit<ExpenseRecord, 'id'>): Promis
       date: newExpense.date,
       description: newExpense.description,
       recorded_by: newExpense.recordedBy,
-      receipt_note: newExpense.receiptNote
-    });
+      receipt_note: newExpense.receiptNote,
+      images: newExpense.images,
+      status: newExpense.status,
+      location: newExpense.location
+    };
+
+    const { error } = await supabase.from('expenses').insert(insertPayload);
     if (error) {
       if (error.code === '42501' || error.message?.includes('row-level security')) {
         throw new Error('Supabase RLS Error: Row Level Security is blocking expense records. Please run the SQL fix in Supabase SQL Editor.');
       }
-      throw new Error(`Database error adding expense: ${error.message}`);
+      // If images, status or location columns don't exist yet, retry without them
+      if (error.message?.includes('images') || error.message?.includes('status') || error.message?.includes('location') || error.code === '42703') {
+        delete insertPayload.images;
+        delete insertPayload.status;
+        delete insertPayload.location;
+        const retryRes = await supabase.from('expenses').insert(insertPayload);
+        if (retryRes.error) {
+          throw new Error(`Database error adding expense: ${retryRes.error.message}`);
+        }
+      } else {
+        throw new Error(`Database error adding expense: ${error.message}`);
+      }
     }
   }
 
@@ -1002,6 +1028,55 @@ export async function addExpense(expenseData: Omit<ExpenseRecord, 'id'>): Promis
   db.expenses.push(newExpense);
   saveDatabase(db);
   return newExpense;
+}
+
+export async function updateExpense(id: string, updates: Partial<ExpenseRecord>): Promise<ExpenseRecord> {
+  if (isSupabaseConfigured && supabase) {
+    const updatePayload: any = {};
+    if (updates.title !== undefined) updatePayload.title = updates.title.trim();
+    if (updates.category !== undefined) updatePayload.category = updates.category;
+    if (updates.amount !== undefined) updatePayload.amount = updates.amount;
+    if (updates.date !== undefined) updatePayload.date = updates.date;
+    if (updates.description !== undefined) updatePayload.description = updates.description.trim();
+    if (updates.receiptNote !== undefined) updatePayload.receipt_note = updates.receiptNote?.trim() || null;
+    if (updates.recordedBy !== undefined) updatePayload.recorded_by = updates.recordedBy;
+    if (updates.images !== undefined) updatePayload.images = updates.images;
+    if (updates.status !== undefined) updatePayload.status = updates.status;
+    if (updates.location !== undefined) updatePayload.location = updates.location?.trim() || null;
+
+    const { error } = await supabase.from('expenses').update(updatePayload).eq('id', id);
+    if (error) {
+      if (error.code === '42501' || error.message?.includes('row-level security')) {
+        throw new Error('Supabase RLS Error: Row Level Security is blocking expense updates.');
+      }
+      if (error.message?.includes('images') || error.message?.includes('status') || error.message?.includes('location') || error.code === '42703') {
+        delete updatePayload.images;
+        delete updatePayload.status;
+        delete updatePayload.location;
+        const retryRes = await supabase.from('expenses').update(updatePayload).eq('id', id);
+        if (retryRes.error) {
+          throw new Error(`Database error updating expense: ${retryRes.error.message}`);
+        }
+      } else {
+        throw new Error(`Database error updating expense: ${error.message}`);
+      }
+    }
+  }
+
+  const db = getDatabase();
+  const index = db.expenses.findIndex(e => e.id === id);
+  if (index >= 0) {
+    db.expenses[index] = { ...db.expenses[index], ...updates };
+    saveDatabase(db);
+    return db.expenses[index];
+  }
+
+  const all = await getAllExpenses();
+  const found = all.find(e => e.id === id);
+  if (found) {
+    return { ...found, ...updates };
+  }
+  throw new Error('Expense record not found to update.');
 }
 
 export async function deleteExpense(id: string): Promise<void> {

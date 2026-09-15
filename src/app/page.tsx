@@ -16,6 +16,7 @@ import { AdminProfileModal } from '@/components/AdminProfileModal';
 import { AddPaidMemberModal } from '@/components/AddPaidMemberModal';
 import { AddExpenseModal } from '@/components/AddExpenseModal';
 import { ChangeMemberPinModal } from '@/components/ChangeMemberPinModal';
+import { ImageViewerModal } from '@/components/ImageViewerModal';
 import { useLanguage } from '@/context/LanguageContext';
 import { 
   TreasurySummary, 
@@ -59,7 +60,12 @@ export default function Home() {
   const [isAdminProfileOpen, setIsAdminProfileOpen] = useState<boolean>(false);
   const [isAddPaidMemberOpen, setIsAddPaidMemberOpen] = useState<boolean>(false);
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState<boolean>(false);
+  const [expenseToEdit, setExpenseToEdit] = useState<ExpenseRecord | null>(null);
   const [isChangeMemberPinOpen, setIsChangeMemberPinOpen] = useState<boolean>(false);
+  const [isImageViewerOpen, setIsImageViewerOpen] = useState<boolean>(false);
+  const [viewerImages, setViewerImages] = useState<string[]>([]);
+  const [viewerIndex, setViewerIndex] = useState<number>(0);
+  const [viewerTitle, setViewerTitle] = useState<string | undefined>();
 
   // Load saved user session and offline instant cache on mount
   useEffect(() => {
@@ -340,8 +346,21 @@ export default function Home() {
                 expenses={expenses}
                 summary={summary}
                 isAdminLoggedIn={isAdmin}
-                onAddExpenseClick={() => setIsAddExpenseOpen(true)}
+                onAddExpenseClick={() => {
+                  setExpenseToEdit(null);
+                  setIsAddExpenseOpen(true);
+                }}
+                onEditExpense={(expense) => {
+                  setExpenseToEdit(expense);
+                  setIsAddExpenseOpen(true);
+                }}
                 onDeleteExpense={handleDeleteExpense}
+                onViewImage={(imgs, idx, title) => {
+                  setViewerImages(imgs);
+                  setViewerIndex(idx);
+                  setViewerTitle(title);
+                  setIsImageViewerOpen(true);
+                }}
               />
             )}
 
@@ -447,14 +466,21 @@ export default function Home() {
         existingMembers={members}
       />
 
-      {/* Add Public Work / Expense Modal */}
+      {/* Add / Edit Public Work / Expense Modal */}
       <AddExpenseModal
         isOpen={isAddExpenseOpen}
-        onClose={() => setIsAddExpenseOpen(false)}
+        onClose={() => {
+          setIsAddExpenseOpen(false);
+          setExpenseToEdit(null);
+        }}
         adminPin={adminPin}
         settings={settings}
         currentUser={currentUser}
-        onExpenseAdded={() => fetchData(true)}
+        expenseToEdit={expenseToEdit}
+        onExpenseAdded={() => {
+          setExpenseToEdit(null);
+          fetchData(true);
+        }}
       />
 
       {/* Change Member PIN Modal */}
@@ -463,6 +489,15 @@ export default function Home() {
         onClose={() => setIsChangeMemberPinOpen(false)}
         currentUser={currentUser}
         onPinChanged={() => fetchData(true)}
+      />
+
+      {/* Full-Screen Work Image Lightbox */}
+      <ImageViewerModal
+        isOpen={isImageViewerOpen}
+        onClose={() => setIsImageViewerOpen(false)}
+        images={viewerImages}
+        initialIndex={viewerIndex}
+        title={viewerTitle}
       />
     </div>
   );

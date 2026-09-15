@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAllExpenses, addExpense, deleteExpense, verifyAdminPin } from '@/lib/store';
+import { getAllExpenses, addExpense, updateExpense, deleteExpense, verifyAdminPin } from '@/lib/store';
 
 export async function GET() {
   try {
@@ -13,7 +13,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { title, category, amount, date, description, receiptNote, adminPin, recordedBy } = body;
+    const { title, category, amount, date, description, receiptNote, adminPin, recordedBy, images, status, location } = body;
 
     if (!(await verifyAdminPin(adminPin))) {
       return NextResponse.json({ error: 'Unauthorized: Invalid Admin PIN' }, { status: 401 });
@@ -30,12 +30,39 @@ export async function POST(request: Request) {
       date: date || new Date().toISOString().split('T')[0],
       description: description?.trim() || '',
       receiptNote: receiptNote?.trim(),
-      recordedBy: recordedBy || 'Admin'
+      recordedBy: recordedBy || 'Admin',
+      images: Array.isArray(images) ? images : [],
+      status: status || 'COMPLETED',
+      location: location?.trim() || undefined
     });
 
     return NextResponse.json({ success: true, expense, message: 'Expense recorded successfully' }, { status: 201 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Failed to record expense' }, { status: 500 });
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const body = await request.json();
+    const { id, adminPin, ...updates } = body;
+
+    if (!(await verifyAdminPin(adminPin || ''))) {
+      return NextResponse.json({ error: 'Unauthorized: Invalid Admin PIN' }, { status: 401 });
+    }
+
+    if (!id) {
+      return NextResponse.json({ error: 'Expense ID is required' }, { status: 400 });
+    }
+
+    if (updates.amount !== undefined) {
+      updates.amount = parseFloat(updates.amount);
+    }
+
+    const updated = await updateExpense(id, updates);
+    return NextResponse.json({ success: true, expense: updated, message: 'Expense updated successfully' });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Failed to update expense' }, { status: 500 });
   }
 }
 

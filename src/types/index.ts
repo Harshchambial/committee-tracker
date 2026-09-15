@@ -59,6 +59,8 @@ export interface PaymentRecord {
   notes?: string;
 }
 
+export type WorkStatus = 'COMPLETED' | 'IN_PROGRESS' | 'PLANNED';
+
 export interface ExpenseRecord {
   id: string;
   title: string;
@@ -68,6 +70,9 @@ export interface ExpenseRecord {
   description: string;
   recordedBy: string;
   receiptNote?: string;
+  images?: string[];
+  status?: WorkStatus;
+  location?: string;
 }
 
 export interface CommitteeSettings {

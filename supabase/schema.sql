@@ -95,8 +95,16 @@ CREATE TABLE IF NOT EXISTS expenses (
   description TEXT,
   recorded_by TEXT DEFAULT 'Admin',
   receipt_note TEXT,
+  images TEXT[] DEFAULT '{}',
+  status TEXT DEFAULT 'COMPLETED',
+  location TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Migration for expenses table:
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS images TEXT[] DEFAULT '{}';
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'COMPLETED';
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS location TEXT;
 
 -- ==============================================================================
 -- 5. DISABLE ROW LEVEL SECURITY (RLS) & GRANT PERMISSIONS
