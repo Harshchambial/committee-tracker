@@ -254,7 +254,7 @@ export default function Home() {
   }
 
   // IF LOGGED IN: SHOW FULL APPLICATION
-  const isAdmin = currentUser.role === 'ADMIN';
+  const isAdmin = currentUser.role === 'ADMIN' || currentUser.role === 'CO_ADMIN' || currentUser.role === 'SUPER_ADMIN';
 
   return (
     <div className="min-h-screen bg-slate-100/70 flex flex-col font-sans antialiased text-slate-900">
@@ -452,6 +452,7 @@ export default function Home() {
         onClose={() => setIsAddExpenseOpen(false)}
         adminPin={adminPin}
         settings={settings}
+        currentUser={currentUser}
         onExpenseAdded={() => fetchData(true)}
       />
 

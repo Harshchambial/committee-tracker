@@ -24,7 +24,8 @@ export async function POST(request: Request) {
         user: {
           name: settings.adminName || settings.payeeName || 'Admin / Organizer',
           phone: settings.adminPhone,
-          role: 'ADMIN'
+          role: 'ADMIN',
+          pin: adminSecret.toString().trim()
         }
       });
     }
@@ -82,7 +83,8 @@ export async function POST(request: Request) {
           name: matchedMember.name,
           phone: matchedMember.phone,
           email: matchedMember.email || email,
-          role: matchedMember.role
+          role: matchedMember.role,
+          pin: expectedPin
         }
       });
     }

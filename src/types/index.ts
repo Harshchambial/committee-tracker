@@ -132,4 +132,6 @@ export interface AuthUser {
   phone?: string;
   email?: string;
   role: UserRole;
+  pin?: string;
 }
+

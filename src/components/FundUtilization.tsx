@@ -186,7 +186,7 @@ export const FundUtilization: React.FC<FundUtilizationProps> = ({
                     : 'To record a public work, click "+ Log New Expense". Once logged, each entry will display a red "Delete / हटाएं" button so you can remove accidental entries or dummy data anytime.'
                 )}
               </p>
-              {selectedCategory === 'ALL' && (
+              {selectedCategory === 'ALL' && isAdminLoggedIn && (
                 <button
                   type="button"
                   onClick={onAddExpenseClick}

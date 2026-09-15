@@ -12,7 +12,7 @@ import {
   AlertCircle,
   Plus
 } from 'lucide-react';
-import { ExpenseCategory, CommitteeSettings } from '@/types';
+import { ExpenseCategory, CommitteeSettings, AuthUser } from '@/types';
 import { useLanguage } from '@/context/LanguageContext';
 
 interface AddExpenseModalProps {
@@ -21,6 +21,7 @@ interface AddExpenseModalProps {
   adminPin: string;
   settings: CommitteeSettings | null;
   onExpenseAdded: () => void;
+  currentUser?: AuthUser | null;
 }
 
 export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
@@ -28,10 +29,14 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   onClose,
   adminPin,
   settings,
-  onExpenseAdded
+  onExpenseAdded,
+  currentUser
 }) => {
   const { isHindi } = useLanguage();
   const titleInputRef = useRef<HTMLInputElement>(null);
+
+  const isAdminTier = currentUser?.role === 'ADMIN' || currentUser?.role === 'CO_ADMIN' || currentUser?.role === 'SUPER_ADMIN';
+  const effectivePin = adminPin || (isAdminTier && currentUser?.pin ? currentUser.pin : '');
 
   // Form Fields
   const [title, setTitle] = useState('');
@@ -40,7 +45,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [receiptNote, setExpenseReceiptNote] = useState('');
   const [description, setDescription] = useState('');
-  const [pinInput, setPinInput] = useState(adminPin || '');
+  const [pinInput, setPinInput] = useState(effectivePin);
 
   // States
   const [isLoading, setIsLoading] = useState(false);
@@ -49,8 +54,10 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   useEffect(() => {
     if (adminPin) {
       setPinInput(adminPin);
+    } else if (isAdminTier && currentUser?.pin) {
+      setPinInput(currentUser.pin);
     }
-  }, [adminPin]);
+  }, [adminPin, currentUser, isAdminTier]);
 
   useEffect(() => {
     if (isOpen) {
@@ -107,7 +114,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           description: description.trim(),
           receiptNote: receiptNote.trim(),
           adminPin: pinToUse,
-          recordedBy: settings?.adminName || 'Admin'
+          recordedBy: currentUser?.name || settings?.adminName || 'Admin'
         })
       });
 
@@ -273,7 +280,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           </div>
 
           {/* Admin PIN (if not already authenticated) */}
-          {!adminPin && (
+          {!effectivePin && (
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                 {isHindi ? 'व्यवस्थापक पिन (Admin PIN) *' : 'Admin PIN *'}

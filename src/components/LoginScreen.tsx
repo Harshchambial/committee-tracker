@@ -80,7 +80,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         throw new Error(data.error || 'Login failed. Please check your mobile number or PIN.');
       }
 
-      onLoginSuccess(data.user);
+      const isAdminRole = data.user.role === 'ADMIN' || data.user.role === 'CO_ADMIN' || data.user.role === 'SUPER_ADMIN';
+      if (isAdminRole) {
+        onLoginSuccess(data.user, memberPin.trim());
+      } else {
+        onLoginSuccess(data.user);
+      }
     } catch (err: any) {
       setErrorMessage(err.message);
     } finally {
