@@ -170,7 +170,6 @@ export const AddPaidMemberModal: React.FC<AddPaidMemberModalProps> = ({
       if (data.payment) {
         setCreatedPayment(data.payment);
       } else {
-        onMemberAdded();
         resetForNext();
       }
 
@@ -318,6 +317,7 @@ export const AddPaidMemberModal: React.FC<AddPaidMemberModalProps> = ({
                 </label>
                 <input
                   type="tel"
+                  inputMode="numeric"
                   placeholder="e.g. 9812345678"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
@@ -415,6 +415,7 @@ export const AddPaidMemberModal: React.FC<AddPaidMemberModalProps> = ({
                         <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">₹</span>
                         <input
                           type="number"
+                          inputMode="numeric"
                           placeholder="1000"
                           value={paidAmount || ''}
                           onChange={(e) => setPaidAmount(Number(e.target.value))}

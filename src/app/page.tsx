@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Navbar } from '@/components/Navbar';
 import { TreasuryOverview } from '@/components/TreasuryOverview';
 import { PaymentMatrix } from '@/components/PaymentMatrix';
@@ -67,6 +67,9 @@ export default function Home() {
   const [viewerIndex, setViewerIndex] = useState<number>(0);
   const [viewerTitle, setViewerTitle] = useState<string | undefined>();
 
+  const latestFetchIdRef = useRef<number>(0);
+  const hasLoadedDataRef = useRef<boolean>(false);
+
   // Load saved user session and offline instant cache on mount
   useEffect(() => {
     try {
@@ -88,6 +91,7 @@ export default function Home() {
         if (parsed.payments) setPayments(parsed.payments);
         if (parsed.matrix) setMatrix(parsed.matrix);
         if (parsed.expenses) setExpenses(parsed.expenses);
+        hasLoadedDataRef.current = true;
         setIsLoading(false); // Screen appears immediately without blank screen
       }
     } catch (e) {
@@ -98,18 +102,33 @@ export default function Home() {
   }, []);
 
   // Fetch unified sync data (1 single network call instead of 5 separate ones)
-  const fetchData = useCallback(async (bypassCache = false) => {
+  const fetchData = useCallback(async (bypassCache = true) => {
+    const fetchId = ++latestFetchIdRef.current;
     try {
       // Only show full-screen spinner if we have zero cached data
-      setIsLoading(prev => (!summary ? true : false));
+      if (!hasLoadedDataRef.current) {
+        setIsLoading(true);
+      }
 
-      const syncUrl = bypassCache 
-        ? `/api/sync?year=${year}&_t=${Date.now()}` 
-        : `/api/sync?year=${year}`;
+      // Always bust browser and CDN cache with timestamp
+      const syncUrl = `/api/sync?year=${year}&_t=${Date.now()}`;
 
-      const res = await fetch(syncUrl);
+      const res = await fetch(syncUrl, {
+        cache: 'no-store',
+        headers: {
+          'Pragma': 'no-cache',
+          'Cache-Control': 'no-cache'
+        }
+      });
+
       if (res.ok) {
         const syncData = await res.json();
+        // Discard stale out-of-order response if another fetch began after this one
+        if (fetchId !== latestFetchIdRef.current) {
+          return;
+        }
+
+        hasLoadedDataRef.current = true;
         setSummary(syncData.summary || null);
         setSettings(syncData.settings || null);
         setMembers(syncData.members || []);
@@ -126,9 +145,11 @@ export default function Home() {
     } catch (error) {
       console.error('Failed to sync committee data:', error);
     } finally {
-      setIsLoading(false);
+      if (fetchId === latestFetchIdRef.current) {
+        setIsLoading(false);
+      }
     }
-  }, [year, summary]);
+  }, [year]);
 
   useEffect(() => {
     fetchData();
@@ -425,7 +446,7 @@ export default function Home() {
         initialMonth={payModalInitialMonth}
         initialYear={payModalInitialYear}
         initialType={payModalInitialType}
-        onPaymentSuccess={fetchData}
+        onPaymentSuccess={() => fetchData(true)}
       />
 
       <ReceiptModal
@@ -461,7 +482,7 @@ export default function Home() {
         onClose={() => setIsAddPaidMemberOpen(false)}
         adminPin={adminPin}
         settings={settings}
-        onMemberAdded={fetchData}
+        onMemberAdded={() => fetchData(true)}
         onViewReceipt={(payment) => setReceiptPayment(payment)}
         existingMembers={members}
       />

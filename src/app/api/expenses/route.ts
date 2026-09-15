@@ -1,10 +1,21 @@
 import { NextResponse } from 'next/server';
 import { getAllExpenses, addExpense, updateExpense, deleteExpense, verifyAdminPin } from '@/lib/store';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
 export async function GET() {
   try {
     const expenses = await getAllExpenses();
-    return NextResponse.json({ expenses });
+    return NextResponse.json({ expenses }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'Surrogate-Control': 'no-store'
+      }
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Failed to fetch expenses' }, { status: 500 });
   }

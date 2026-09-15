@@ -1084,6 +1084,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 </label>
                 <input
                   type="number"
+                  inputMode="numeric"
                   value={offlineAmount}
                   onChange={(e) => {
                     const val = Number(e.target.value);
@@ -1474,6 +1475,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 </label>
                 <input
                   type="tel"
+                  inputMode="numeric"
                   placeholder="e.g. 9812345678"
                   value={newMemberPhone}
                   onChange={(e) => setNewMemberPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}

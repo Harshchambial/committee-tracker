@@ -354,6 +354,7 @@ export const PayDuesModal: React.FC<PayDuesModalProps> = ({
                   </label>
                   <input
                     type="number"
+                    inputMode="numeric"
                     value={selectedYear}
                     onChange={(e) => setSelectedYear(Number(e.target.value))}
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-bold text-xs sm:text-sm text-slate-900"
@@ -389,6 +390,7 @@ export const PayDuesModal: React.FC<PayDuesModalProps> = ({
                   </label>
                   <input
                     type="tel"
+                    inputMode="numeric"
                     placeholder={isHindi ? 'उदा. 9876543210' : 'e.g. 9876543210'}
                     value={contributorPhone}
                     onChange={(e) => setContributorPhone(e.target.value)}
@@ -422,6 +424,7 @@ export const PayDuesModal: React.FC<PayDuesModalProps> = ({
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400">₹</span>
                   <input
                     type="number"
+                    inputMode="numeric"
                     min="1"
                     value={customAmount}
                     onChange={(e) => setCustomAmount(e.target.value)}

@@ -250,6 +250,39 @@ export const Navbar: React.FC<NavbarProps> = ({
                           </div>
                         </button>
 
+                        {/* 1b. Direct Admin Portal (For Admins on Mobile & Desktop) */}
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveTab('admin');
+                              setIsUserMenuOpen(false);
+                            }}
+                            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition cursor-pointer ${
+                              activeTab === 'admin'
+                                ? 'bg-amber-100 text-amber-950 border border-amber-300'
+                                : 'text-slate-700 hover:bg-amber-50 hover:text-amber-900'
+                            }`}
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-amber-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                              <ShieldCheck className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <div className="text-slate-900 font-extrabold flex items-center gap-1.5">
+                                <span>{isHindi ? 'व्यवस्थापक कक्ष (Admin Portal)' : 'Admin Management Portal'}</span>
+                                {pendingApprovals > 0 && (
+                                  <span className="px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[9px] font-black animate-pulse">
+                                    {pendingApprovals}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-slate-400 font-normal">
+                                {isHindi ? 'भुगतान सत्यापन, सदस्य सूची, नकद प्रविष्टि' : 'Verify payments, members & treasury controls'}
+                              </div>
+                            </div>
+                          </button>
+                        )}
+
                         {/* 2. Admin Profile & PIN Edit (if Admin) */}
                         {isAdmin && (
                           <button
@@ -366,7 +399,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       </header>
 
       {/* Mobile Bottom Navigation Bar (Clean 5 Thumb-Friendly Tabs) */}
-      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-lg px-2 py-1.5 flex items-center justify-around">
+      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-lg px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] flex items-center justify-around">
         {mobileTabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;

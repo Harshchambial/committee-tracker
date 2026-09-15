@@ -247,104 +247,108 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-7 shadow-2xl border border-slate-200 relative my-auto max-h-[92vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-2xl ${isEditMode ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-              {isEditMode ? <Edit3 className="w-6 h-6" /> : <ReceiptIndianRupee className="w-6 h-6" />}
+      <div className="bg-white rounded-3xl max-w-lg w-full flex flex-col shadow-2xl border border-slate-200 relative my-auto max-h-[92dvh] overflow-hidden">
+        {/* Sticky Header with Prominent Close Button */}
+        <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md px-4 sm:px-6 py-3.5 border-b border-slate-100 flex items-center justify-between shrink-0 shadow-2xs">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 pr-2">
+            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${isEditMode ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+              {isEditMode ? <Edit3 className="w-5 h-5" /> : <ReceiptIndianRupee className="w-5 h-5" />}
             </div>
-            <div>
-              <h3 className="text-lg font-black text-slate-900 tracking-tight">
+            <div className="min-w-0">
+              <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight truncate">
                 {isEditMode
                   ? (isHindi ? 'सार्वजनिक कार्य / व्यय संपादित करें' : 'Edit Public Work / Expense')
                   : (isHindi ? 'नया सार्वजनिक कार्य / व्यय दर्ज करें' : 'Log New Public Work / Expense')}
               </h3>
-              <p className="text-xs text-slate-500 font-medium">
-                {isHindi ? 'कार्य का विवरण, तस्वीरें और 100% पारदर्शी हिसाब' : 'Project details, work photos and full transparency records'}
+              <p className="text-[11px] text-slate-500 font-medium truncate">
+                {isHindi ? 'कार्य का विवरण, तस्वीरें और पारदर्शी हिसाब' : 'Project details, work photos and records'}
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition cursor-pointer"
+            className="w-9 h-9 rounded-full bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 flex items-center justify-center transition cursor-pointer border border-slate-200 active:scale-95 shadow-2xs shrink-0"
+            aria-label={isHindi ? 'बंद करें' : 'Close'}
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5 stroke-[2.5]" />
           </button>
         </div>
 
-        {/* Error Alert */}
-        {errorMessage && (
-          <div className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 flex items-center gap-2 text-rose-700 text-xs font-semibold">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{errorMessage}</span>
-          </div>
-        )}
+        {/* Scrollable Form Body */}
+        <div className="overflow-y-auto p-4 sm:p-6 space-y-4">
+          {/* Error Alert */}
+          {errorMessage && (
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 flex items-center gap-2 text-rose-700 text-xs font-semibold">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-          {/* Work / Expense Title */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-              {isHindi ? 'कार्य / व्यय शीर्षक *' : 'Work / Expense Title *'}
-            </label>
-            <input
-              ref={titleInputRef}
-              type="text"
-              placeholder={isHindi ? 'उदा. श्मशान घाट जीर्णोद्धार / स्ट्रीट लाइट' : 'e.g. Shamshan Ghat Renovation / Street Light'}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-900 text-sm font-semibold focus:outline-hidden focus:ring-2 focus:ring-amber-500/30"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Category */}
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Work / Expense Title */}
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                {isHindi ? 'श्रेणी *' : 'Category *'}
+                {isHindi ? 'कार्य / व्यय शीर्षक *' : 'Work / Expense Title *'}
               </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value as any)}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-slate-900 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500/30 font-medium"
-              >
-                <option value="COMMUNITY_WELFARE">{isHindi ? 'सार्वजनिक कार्य / विकास' : 'Community Welfare'}</option>
-                <option value="EVENT">{isHindi ? 'बैठक एवं आयोजन' : 'Event & Meeting'}</option>
-                <option value="CHARITY">{isHindi ? 'दान एवं सहायता' : 'Charity & Donation'}</option>
-                <option value="DISBURSEMENT">{isHindi ? 'आवंटन / ऋण' : 'Member Loan / Disbursement'}</option>
-                <option value="ADMINISTRATIVE">{isHindi ? 'प्रशासन एवं पंजी' : 'Admin & Stationery'}</option>
-                <option value="MAINTENANCE">{isHindi ? 'मरम्मत एवं रखरखाव' : 'Maintenance'}</option>
-                <option value="OTHER">{isHindi ? 'अन्य कार्य' : 'Other'}</option>
-              </select>
+              <input
+                ref={titleInputRef}
+                type="text"
+                placeholder={isHindi ? 'उदा. श्मशान घाट जीर्णोद्धार / स्ट्रीट लाइट' : 'e.g. Shamshan Ghat Renovation / Street Light'}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-900 text-sm font-semibold focus:outline-hidden focus:ring-2 focus:ring-amber-500/30"
+              />
             </div>
 
-            {/* Amount */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                {isHindi ? 'खर्च राशि (₹) *' : 'Amount (₹) *'}
-              </label>
-              <div className="relative">
-                <IndianRupee className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 stroke-[2.5]" />
-                <input
-                  type="number"
-                  placeholder="1500"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  required
-                  min="1"
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 text-slate-900 text-xs sm:text-sm font-black focus:outline-hidden focus:ring-2 focus:ring-amber-500/30"
-                />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Category */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  {isHindi ? 'श्रेणी *' : 'Category *'}
+                </label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value as any)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-slate-900 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500/30 font-medium"
+                >
+                  <option value="COMMUNITY_WELFARE">{isHindi ? 'सार्वजनिक कार्य / विकास' : 'Community Welfare'}</option>
+                  <option value="EVENT">{isHindi ? 'बैठक एवं आयोजन' : 'Event & Meeting'}</option>
+                  <option value="CHARITY">{isHindi ? 'दान एवं सहायता' : 'Charity & Donation'}</option>
+                  <option value="DISBURSEMENT">{isHindi ? 'आवंटन / ऋण' : 'Member Loan / Disbursement'}</option>
+                  <option value="ADMINISTRATIVE">{isHindi ? 'प्रशासन एवं पंजी' : 'Admin & Stationery'}</option>
+                  <option value="MAINTENANCE">{isHindi ? 'मरम्मत एवं रखरखाव' : 'Maintenance'}</option>
+                  <option value="OTHER">{isHindi ? 'अन्य कार्य' : 'Other'}</option>
+                </select>
+              </div>
+
+              {/* Amount */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  {isHindi ? 'खर्च राशि (₹) *' : 'Amount (₹) *'}
+                </label>
+                <div className="relative">
+                  <IndianRupee className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 stroke-[2.5]" />
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    placeholder="1500"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    required
+                    min="1"
+                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 text-slate-900 text-xs sm:text-sm font-black focus:outline-hidden focus:ring-2 focus:ring-amber-500/30"
+                  />
+                </div>
               </div>
             </div>
-          </div>
 
           <div className="grid grid-cols-2 gap-3">
             {/* Date */}
@@ -487,6 +491,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               </label>
               <input
                 type="password"
+                inputMode="numeric"
                 placeholder="****"
                 value={pinInput}
                 onChange={(e) => setPinInput(e.target.value)}
@@ -524,5 +529,6 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         </form>
       </div>
     </div>
+  </div>
   );
 };
