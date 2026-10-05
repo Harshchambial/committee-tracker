@@ -6,15 +6,14 @@ import {
   Shield, 
   Lock, 
   User, 
-  Phone, 
   Mail, 
   ArrowRight, 
   AlertCircle, 
   Eye, 
   EyeOff,
   ShieldCheck,
-  CheckCircle2,
-  Languages
+  Languages,
+  Camera
 } from 'lucide-react';
 import { AuthUser, CommitteeSettings } from '@/types';
 import { useLanguage } from '@/context/LanguageContext';
@@ -86,8 +85,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       } else {
         onLoginSuccess(data.user);
       }
-    } catch (err: any) {
-      setErrorMessage(err.message);
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof Error ? err.message : 'Login failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -119,8 +118,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       }
 
       onLoginSuccess(data.user, adminPassword.trim());
-    } catch (err: any) {
-      setErrorMessage(err.message);
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof Error ? err.message : 'Login failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -161,6 +160,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
       {/* Main Login Card */}
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
+        <a
+          href="/public-works"
+          className="mb-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm font-extrabold text-emerald-200 transition hover:bg-emerald-400/15"
+        >
+          <Camera className="h-4 w-4" />
+          {isHindi ? 'सार्वजनिक विकास कार्य और तस्वीरें देखें' : 'View Public Work & Photos'}
+        </a>
         <div className="bg-white text-slate-900 rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-200">
           {/* Role Switcher Tabs */}
           <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 mb-6">

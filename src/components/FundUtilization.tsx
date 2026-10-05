@@ -7,15 +7,11 @@ import {
   Plus, 
   Search, 
   Calendar, 
-  Tag, 
   CheckCircle2, 
   FileText, 
-  Filter, 
   Trash2,
   Camera,
-  Image as ImageIcon,
   MapPin,
-  Clock,
   Edit3,
   Share2,
   ExternalLink
@@ -91,7 +87,7 @@ export const FundUtilization: React.FC<FundUtilizationProps> = ({
       `✅ *स्थिति:* ${statusText}\n` +
       (exp.description ? `📝 *विवरण:* ${exp.description}\n` : '') +
       (exp.images && exp.images.length > 0 ? `📷 *तस्वीरें:* ${exp.images.length} तस्वीरें ऑनलाइन उपलब्ध हैं\n` : '') +
-      `\n🔗 *100% पारदर्शी सच्चा हिसाब एवं तस्वीरें यहाँ देखें:* \nhttps://vikassamiti.vercel.app`
+      `\n🔗 *100% पारदर्शी सच्चा हिसाब एवं तस्वीरें यहाँ देखें:* \nhttps://vikassamiti.vercel.app/public-works#${encodeURIComponent(exp.id)}`
     );
     window.open(`https://wa.me/?text=${text}`, '_blank');
   };
