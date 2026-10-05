@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getAllExpenses, addExpense, updateExpense, deleteExpense, verifyAdminPin } from '@/lib/store';
+import { getSession, isAdminSession } from '@/lib/session';
+
+function requireAdmin(request: Request) {
+  return isAdminSession(getSession(request));
+}
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -23,6 +28,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    if (!requireAdmin(request)) {
+      return NextResponse.json({ error: 'Administrator access required' }, { status: 403 });
+    }
     const body = await request.json();
     const { title, category, amount, date, description, receiptNote, adminPin, recordedBy, images, status, location } = body;
 
@@ -55,6 +63,9 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    if (!requireAdmin(request)) {
+      return NextResponse.json({ error: 'Administrator access required' }, { status: 403 });
+    }
     const body = await request.json();
     const { id, adminPin, ...updates } = body;
 
@@ -79,6 +90,9 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    if (!requireAdmin(request)) {
+      return NextResponse.json({ error: 'Administrator access required' }, { status: 403 });
+    }
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     const adminPin = searchParams.get('adminPin');

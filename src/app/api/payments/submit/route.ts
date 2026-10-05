@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server';
 import { submitPayment } from '@/lib/store';
+import { getSession, isAdminSession } from '@/lib/session';
 
 export async function POST(request: Request) {
   try {
+    const session = getSession(request);
+    if (!session) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
     const body = await request.json();
     const { 
       memberId, 
@@ -20,6 +25,10 @@ export async function POST(request: Request) {
 
     const isPublic = contributionType === 'PUBLIC_SEVA';
     const isCash = paymentMethod === 'CASH';
+
+    if (!isPublic && !isAdminSession(session) && memberId !== session.sub) {
+      return NextResponse.json({ error: 'You can only submit your own monthly contribution.' }, { status: 403 });
+    }
 
     if (!isCash && !utrNumber) {
       return NextResponse.json({ 

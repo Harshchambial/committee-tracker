@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
 import { getDatabase, saveDatabase, verifyAdminPin } from '@/lib/store';
+import { getSession, isAdminSession } from '@/lib/session';
 
 export async function GET(request: Request) {
   try {
+    if (!isAdminSession(getSession(request))) {
+      return NextResponse.json({ error: 'Administrator access required' }, { status: 403 });
+    }
     const { searchParams } = new URL(request.url);
     const adminPin = searchParams.get('adminPin');
 
-    if (!verifyAdminPin(adminPin || '')) {
+    if (!(await verifyAdminPin(adminPin || ''))) {
       return NextResponse.json({ error: 'Unauthorized: Invalid Admin PIN' }, { status: 401 });
     }
 
@@ -25,10 +29,13 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    if (!isAdminSession(getSession(request))) {
+      return NextResponse.json({ error: 'Administrator access required' }, { status: 403 });
+    }
     const body = await request.json();
     const { adminPin, backupData } = body;
 
-    if (!verifyAdminPin(adminPin)) {
+    if (!(await verifyAdminPin(adminPin))) {
       return NextResponse.json({ error: 'Unauthorized: Invalid Admin PIN' }, { status: 401 });
     }
 

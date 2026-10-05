@@ -33,8 +33,14 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# local production snapshots (contain private committee data)
+/.private-backups/
+
 # vercel
 .vercel
+
+# Supabase CLI local state
+/supabase/.temp/
 
 # typescript
 *.tsbuildinfo

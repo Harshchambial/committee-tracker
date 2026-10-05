@@ -39,7 +39,7 @@ const compressImage = (file: File): Promise<string> => {
     reader.onload = (readerEvent) => {
       const img = new Image();
       img.onload = () => {
-        const maxDimension = 1200;
+        const maxDimension = 900;
         let width = img.width;
         let height = img.height;
 
@@ -60,7 +60,7 @@ const compressImage = (file: File): Promise<string> => {
           return;
         }
         ctx.drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
         resolve(dataUrl);
       };
       img.onerror = reject;
@@ -162,10 +162,19 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     try {
       const files = Array.from(e.target.files);
       const compressedList = await Promise.all(files.map(compressImage));
-      setImages(prev => [...prev, ...compressedList].slice(0, 10)); // up to 10 photos
+      const nextImages = [...images, ...compressedList].slice(0, 10);
+      const encodedBytes = nextImages.reduce((total, image) => total + image.length, 0);
+      if (encodedBytes > 3_500_000) {
+        throw new Error('PHOTO_PAYLOAD_TOO_LARGE');
+      }
+      setImages(nextImages); // up to 10 photos within the safe request limit
     } catch (err) {
       console.error('Failed to compress image:', err);
-      setErrorMessage(isHindi ? 'तस्वीर प्रोसेस करने में त्रुटि हुई।' : 'Failed to process selected image.');
+      setErrorMessage(
+        err instanceof Error && err.message === 'PHOTO_PAYLOAD_TOO_LARGE'
+          ? (isHindi ? 'तस्वीरें बहुत बड़ी हैं। कृपया कम तस्वीरें चुनें।' : 'The selected photos are too large. Please choose fewer photos.')
+          : (isHindi ? 'तस्वीर प्रोसेस करने में त्रुटि हुई।' : 'Failed to process selected image.')
+      );
     } finally {
       setIsProcessingImages(false);
       if (e.target) e.target.value = '';

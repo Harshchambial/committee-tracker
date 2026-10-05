@@ -1009,15 +1009,9 @@ export async function addExpense(expenseData: Omit<ExpenseRecord, 'id'>): Promis
       if (error.code === '42501' || error.message?.includes('row-level security')) {
         throw new Error('Supabase RLS Error: Row Level Security is blocking expense records. Please run the SQL fix in Supabase SQL Editor.');
       }
-      // If images, status or location columns don't exist yet, retry without them
+      // Never report success after silently dropping public-work details.
       if (error.message?.includes('images') || error.message?.includes('status') || error.message?.includes('location') || error.code === '42703') {
-        delete insertPayload.images;
-        delete insertPayload.status;
-        delete insertPayload.location;
-        const retryRes = await supabase.from('expenses').insert(insertPayload);
-        if (retryRes.error) {
-          throw new Error(`Database error adding expense: ${retryRes.error.message}`);
-        }
+        throw new Error('The expenses table is missing the photo/status columns. Run the latest additive database migration; no expense was saved.');
       } else {
         throw new Error(`Database error adding expense: ${error.message}`);
       }
@@ -1050,13 +1044,7 @@ export async function updateExpense(id: string, updates: Partial<ExpenseRecord>)
         throw new Error('Supabase RLS Error: Row Level Security is blocking expense updates.');
       }
       if (error.message?.includes('images') || error.message?.includes('status') || error.message?.includes('location') || error.code === '42703') {
-        delete updatePayload.images;
-        delete updatePayload.status;
-        delete updatePayload.location;
-        const retryRes = await supabase.from('expenses').update(updatePayload).eq('id', id);
-        if (retryRes.error) {
-          throw new Error(`Database error updating expense: ${retryRes.error.message}`);
-        }
+        throw new Error('The expenses table is missing the photo/status columns. Run the latest additive database migration; no changes were saved.');
       } else {
         throw new Error(`Database error updating expense: ${error.message}`);
       }
@@ -1478,28 +1466,6 @@ export async function getFullCommitteeSync(year: number = new Date().getFullYear
     }
     return p;
   });
-
-  // Auto-heal any stale member_name in Supabase in background
-  const sbClient = supabase;
-  if (isSupabaseConfigured && sbClient) {
-    const outdatedInDb = rawPayments.filter(p => {
-      if (!p.memberId || !memberById.has(p.memberId)) return false;
-      const mem = memberById.get(p.memberId)!;
-      return mem.name && mem.name !== p.memberName;
-    });
-
-    if (outdatedInDb.length > 0) {
-      Promise.allSettled(
-        outdatedInDb.map(p => {
-          const mem = memberById.get(p.memberId!)!;
-          return sbClient
-            .from('payments')
-            .update({ member_name: mem.name, contributor_phone: mem.phone })
-            .eq('id', p.id);
-        })
-      ).catch(e => console.warn('Background payment name auto-heal warning:', e));
-    }
-  }
 
   const now = new Date();
   const currentMonth = now.getMonth() + 1;

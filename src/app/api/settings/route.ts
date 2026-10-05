@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSettings, updateSettings, verifyAdminPin } from '@/lib/store';
+import { getSession, isAdminSession } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -24,6 +25,9 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
+    if (!isAdminSession(getSession(request))) {
+      return NextResponse.json({ error: 'Administrator access required' }, { status: 403 });
+    }
     const body = await request.json();
     const { adminPin, updates } = body;
 

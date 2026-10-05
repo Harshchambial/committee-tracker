@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getSettings, updateSettings, verifyAdminPin } from '@/lib/store';
+import { getSession, isAdminSession } from '@/lib/session';
 
 export async function POST(request: Request) {
   try {
+    if (!isAdminSession(getSession(request))) {
+      return NextResponse.json({ error: 'Administrator access required' }, { status: 403 });
+    }
     const body = await request.json();
     const { adminPin, name, phone, newPin } = body;
 
@@ -45,7 +49,7 @@ export async function POST(request: Request) {
         phone: updates.adminPhone,
         role: 'ADMIN'
       },
-      newPin: updates.adminPin
+      pinChanged: Boolean(updates.adminPin)
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message || 'Failed to update profile' }, { status: 500 });

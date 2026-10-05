@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { resetToFreshStart, verifyAdminPin } from '@/lib/store';
+import { getSession, isAdminSession } from '@/lib/session';
 
 export async function POST(request: Request) {
   try {
+    if (!isAdminSession(getSession(request))) {
+      return NextResponse.json({ error: 'Administrator access required' }, { status: 403 });
+    }
     const body = await request.json();
     const { adminPin } = body;
 

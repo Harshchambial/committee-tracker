@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { logAdvancePayment, verifyAdminPin, getSettings } from '@/lib/store';
+import { getSession, isAdminSession } from '@/lib/session';
 
 export async function POST(request: Request) {
   try {
+    if (!isAdminSession(getSession(request))) {
+      return NextResponse.json({ error: 'Administrator access required' }, { status: 403 });
+    }
     const body = await request.json();
     const { 
       memberId, 
@@ -23,11 +27,8 @@ export async function POST(request: Request) {
       );
     }
 
-    if (adminPin) {
-      const isValid = await verifyAdminPin(adminPin.trim());
-      if (!isValid) {
-        return NextResponse.json({ error: 'Unauthorized: Invalid Admin PIN' }, { status: 401 });
-      }
+    if (!adminPin || !(await verifyAdminPin(adminPin.trim()))) {
+      return NextResponse.json({ error: 'Unauthorized: Invalid Admin PIN' }, { status: 401 });
     }
 
     const settings = await getSettings();

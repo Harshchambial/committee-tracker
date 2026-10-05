@@ -70,35 +70,47 @@ export default function Home() {
   const latestFetchIdRef = useRef<number>(0);
   const hasLoadedDataRef = useRef<boolean>(false);
 
-  // Load saved user session and offline instant cache on mount
+  // Restore UI state only after the server verifies the signed HTTP-only session.
   useEffect(() => {
-    try {
-      const savedUser = localStorage.getItem('samiti_auth_user');
-      const savedPin = localStorage.getItem('samiti_admin_pin');
-      if (savedUser) {
-        const parsed = JSON.parse(savedUser) as AuthUser;
-        setCurrentUser(parsed);
-        if (savedPin) setAdminPin(savedPin);
-      }
+    let cancelled = false;
 
-      // Offline-First / Instant UI: populate from previous sync cache in 0.05s
-      const cachedSync = localStorage.getItem('samiti_cached_sync');
-      if (cachedSync) {
-        const parsed = JSON.parse(cachedSync);
-        if (parsed.summary) setSummary(parsed.summary);
-        if (parsed.settings) setSettings(parsed.settings);
-        if (parsed.members) setMembers(parsed.members);
-        if (parsed.payments) setPayments(parsed.payments);
-        if (parsed.matrix) setMatrix(parsed.matrix);
-        if (parsed.expenses) setExpenses(parsed.expenses);
-        hasLoadedDataRef.current = true;
-        setIsLoading(false); // Screen appears immediately without blank screen
+    const restoreSession = async () => {
+      try {
+        const response = await fetch('/api/auth/session', { cache: 'no-store' });
+        if (!response.ok) throw new Error('No active session');
+
+        const data = await response.json();
+        if (cancelled || !data.user) return;
+
+        const savedUser = localStorage.getItem('samiti_auth_user');
+        const savedPin = localStorage.getItem('samiti_admin_pin');
+        const localUser = savedUser ? JSON.parse(savedUser) as AuthUser : null;
+        setCurrentUser({ ...(localUser || {}), ...data.user });
+        if (savedPin) setAdminPin(savedPin);
+
+        const cachedSync = localStorage.getItem('samiti_cached_sync');
+        if (cachedSync) {
+          const parsed = JSON.parse(cachedSync);
+          if (parsed.summary) setSummary(parsed.summary);
+          if (parsed.settings) setSettings(parsed.settings);
+          if (parsed.members) setMembers(parsed.members);
+          if (parsed.payments) setPayments(parsed.payments);
+          if (parsed.matrix) setMatrix(parsed.matrix);
+          if (parsed.expenses) setExpenses(parsed.expenses);
+          hasLoadedDataRef.current = true;
+          setIsLoading(false);
+        }
+      } catch {
+        localStorage.removeItem('samiti_auth_user');
+        localStorage.removeItem('samiti_admin_pin');
+        localStorage.removeItem('samiti_cached_sync');
+      } finally {
+        if (!cancelled) setIsAuthChecking(false);
       }
-    } catch (e) {
-      console.error('Failed to parse saved session/cache:', e);
-    } finally {
-      setIsAuthChecking(false);
-    }
+    };
+
+    restoreSession();
+    return () => { cancelled = true; };
   }, []);
 
   // Fetch unified sync data (1 single network call instead of 5 separate ones)
@@ -152,8 +164,8 @@ export default function Home() {
   }, [year]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (currentUser) fetchData();
+  }, [fetchData, currentUser]);
 
   // Handlers
   const handleLoginSuccess = (user: AuthUser, adminSecret?: string) => {
@@ -175,11 +187,13 @@ export default function Home() {
   };
 
   const handleLogout = () => {
+    fetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
     setCurrentUser(null);
     setAdminPin('');
     try {
       localStorage.removeItem('samiti_auth_user');
       localStorage.removeItem('samiti_admin_pin');
+      localStorage.removeItem('samiti_cached_sync');
     } catch (e) {
       console.error('Failed to clear session:', e);
     }

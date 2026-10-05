@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAllMembers, getSettings, verifyAdminPin } from '@/lib/store';
+import { createSessionToken, setSessionCookie } from '@/lib/session';
 
 export async function POST(request: Request) {
   try {
@@ -19,15 +20,18 @@ export async function POST(request: Request) {
       }
 
       const settings = await getSettings();
-      return NextResponse.json({
+      const user = {
+        id: 'committee-admin',
+        name: settings.adminName || settings.payeeName || 'Admin / Organizer',
+        phone: settings.adminPhone,
+        role: 'ADMIN' as const
+      };
+      const response = NextResponse.json({
         success: true,
-        user: {
-          name: settings.adminName || settings.payeeName || 'Admin / Organizer',
-          phone: settings.adminPhone,
-          role: 'ADMIN',
-          pin: adminSecret.toString().trim()
-        }
+        user
       });
+      setSessionCookie(response, createSessionToken({ sub: user.id, name: user.name, role: user.role }));
+      return response;
     }
 
     // MEMBER LOGIN
@@ -76,17 +80,23 @@ export async function POST(request: Request) {
         }, { status: 401 });
       }
 
-      return NextResponse.json({
+      const user = {
+        id: matchedMember.id,
+        name: matchedMember.name,
+        phone: matchedMember.phone,
+        email: matchedMember.email || email,
+        role: matchedMember.role
+      };
+      const response = NextResponse.json({
         success: true,
-        user: {
-          id: matchedMember.id,
-          name: matchedMember.name,
-          phone: matchedMember.phone,
-          email: matchedMember.email || email,
-          role: matchedMember.role,
-          pin: expectedPin
-        }
+        user
       });
+      setSessionCookie(response, createSessionToken({
+        sub: matchedMember.id,
+        name: matchedMember.name,
+        role: matchedMember.role
+      }));
+      return response;
     }
 
     return NextResponse.json({ success: false, error: 'Invalid login type' }, { status: 400 });

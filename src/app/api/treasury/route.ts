@@ -9,7 +9,8 @@ export async function GET() {
   try {
     const summary = await getTreasurySummary();
     const settings = await getSettings();
-    return NextResponse.json({ summary, settings }, {
+    const { adminPin: _adminPin, ...safeSettings } = settings;
+    return NextResponse.json({ summary, settings: safeSettings }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
         'Pragma': 'no-cache',

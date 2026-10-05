@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAllPayments, deletePayment, verifyAdminPin } from '@/lib/store';
+import { getSession, isAdminSession } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -23,6 +24,9 @@ export async function GET() {
 
 export async function DELETE(request: Request) {
   try {
+    if (!isAdminSession(getSession(request))) {
+      return NextResponse.json({ error: 'Administrator access required' }, { status: 403 });
+    }
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     const adminPin = searchParams.get('adminPin');
@@ -31,11 +35,8 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Payment ID is required' }, { status: 400 });
     }
 
-    if (adminPin) {
-      const isValid = await verifyAdminPin(adminPin.trim());
-      if (!isValid) {
-        return NextResponse.json({ error: 'Unauthorized: Invalid Admin PIN' }, { status: 401 });
-      }
+    if (!adminPin || !(await verifyAdminPin(adminPin.trim()))) {
+      return NextResponse.json({ error: 'Unauthorized: Invalid Admin PIN' }, { status: 401 });
     }
 
     await deletePayment(id);

@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import { updateMemberPin, adminResetMemberPin, verifyAdminPin } from '@/lib/store';
+import { getSession, isAdminSession } from '@/lib/session';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { memberId, currentPin, newPin, adminPin } = body;
+    const session = getSession(request);
 
     if (!memberId) {
       return NextResponse.json({ error: 'Member ID is required.' }, { status: 400 });
@@ -12,6 +14,9 @@ export async function POST(request: Request) {
 
     // Admin Reset Flow
     if (adminPin) {
+      if (!isAdminSession(session)) {
+        return NextResponse.json({ error: 'Administrator access required' }, { status: 403 });
+      }
       const isValid = await verifyAdminPin(adminPin.trim());
       if (!isValid) {
         return NextResponse.json({ error: 'Unauthorized: Invalid Admin PIN' }, { status: 401 });
@@ -22,6 +27,9 @@ export async function POST(request: Request) {
     }
 
     // Self-Service Member Flow
+    if (!session || session.sub !== memberId) {
+      return NextResponse.json({ error: 'You can only change your own PIN.' }, { status: 403 });
+    }
     if (!currentPin || !newPin) {
       return NextResponse.json(
         { error: 'Current PIN and new 4-digit PIN are both required.' }, 
