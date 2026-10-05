@@ -8,7 +8,6 @@ import {
   Search, 
   IndianRupee, 
   Printer, 
-  Filter,
   MessageCircle,
   LayoutGrid,
   Table as TableIcon,
@@ -19,6 +18,7 @@ import {
 } from 'lucide-react';
 import { MemberMatrixRow, PaymentRecord, CommitteeSettings } from '@/types';
 import { useLanguage } from '@/context/LanguageContext';
+import { MarkPaidModal } from '@/components/MarkPaidModal';
 
 interface PaymentMatrixProps {
   matrix: MemberMatrixRow[];
@@ -28,7 +28,9 @@ interface PaymentMatrixProps {
   onSelectPaymentForReceipt: (payment: PaymentRecord) => void;
   onPayForMember: (memberId: string, month: number, year: number) => void;
   isAdminLoggedIn: boolean;
-  onOpenAdminVerify: (paymentId: string) => void;
+  adminPin: string;
+  verifiedBy: string;
+  onPaymentRecorded: (payment: PaymentRecord) => void;
 }
 
 export const PaymentMatrix: React.FC<PaymentMatrixProps> = ({
@@ -39,20 +41,31 @@ export const PaymentMatrix: React.FC<PaymentMatrixProps> = ({
   onSelectPaymentForReceipt,
   onPayForMember,
   isAdminLoggedIn,
-  onOpenAdminVerify
+  adminPin,
+  verifiedBy,
+  onPaymentRecorded
 }) => {
-  const { t, isHindi, getMonthShort, getMonthName } = useLanguage();
+  const { isHindi, getMonthShort, getMonthName } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'ALL' | 'PENDING' | 'PAID'>('ALL');
   // Default to Card view on mobile, Table on desktop
   const [viewMode, setViewMode] = useState<'CARDS' | 'TABLE'>('CARDS');
   const [expandedMemberIds, setExpandedMemberIds] = useState<Record<string, boolean>>({});
+  const [markPaidTarget, setMarkPaidTarget] = useState<{ row: MemberMatrixRow; month: number; year: number } | null>(null);
 
   const currentMonth = new Date().getMonth() + 1; // 1-12
   const currentYear = new Date().getFullYear();
 
   const toggleExpand = (id: string) => {
     setExpandedMemberIds(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleDueAction = (row: MemberMatrixRow, month: number, targetYear: number) => {
+    if (isAdminLoggedIn) {
+      setMarkPaidTarget({ row, month, year: targetYear });
+    } else {
+      onPayForMember(row.member.id, month, targetYear);
+    }
   };
 
   const filteredMatrix = matrix.filter(row => {
@@ -79,8 +92,6 @@ export const PaymentMatrix: React.FC<PaymentMatrixProps> = ({
       return sum;
     }, 0);
   }
-
-  const grandTotalPaid = matrix.reduce((sum, row) => sum + row.totalPaid, 0);
 
   const handleWhatsAppReminder = (row: MemberMatrixRow, month: number) => {
     const memberName = row.member.name;
@@ -308,11 +319,11 @@ export const PaymentMatrix: React.FC<PaymentMatrixProps> = ({
                         )}
                         {!isCurrentPaid && !isCurrentPending && (
                           <button
-                            onClick={() => onPayForMember(row.member.id, currentMonth, year)}
+                            onClick={() => handleDueAction(row, currentMonth, year)}
                             className="inline-flex items-center gap-1 text-[11px] font-extrabold text-white bg-emerald-600 hover:bg-emerald-500 px-2.5 py-1 rounded-lg shadow-xs transition cursor-pointer"
                           >
-                            <QrCode className="w-3 h-3" />
-                            {isHindi ? 'दें' : 'Pay'}
+                            {isAdminLoggedIn ? <CheckCircle2 className="w-3 h-3" /> : <QrCode className="w-3 h-3" />}
+                            {isAdminLoggedIn ? (isHindi ? 'जमा करें' : 'Mark Paid') : (isHindi ? 'दें' : 'Pay')}
                           </button>
                         )}
                         {isAdminLoggedIn && !isCurrentPaid && !isCurrentPending && (
@@ -382,10 +393,10 @@ export const PaymentMatrix: React.FC<PaymentMatrixProps> = ({
                                   <span>{isHindi ? 'जांच' : 'Rev'}</span>
                                 ) : status === 'DUE' ? (
                                   <button 
-                                    onClick={() => onPayForMember(row.member.id, mNum, year)}
+                                    onClick={() => handleDueAction(row, mNum, year)}
                                     className="text-rose-700 hover:underline"
                                   >
-                                    {isHindi ? 'बाकी' : 'Due'}
+                                    {isAdminLoggedIn ? (isHindi ? 'जमा' : 'Mark') : (isHindi ? 'बाकी' : 'Due')}
                                   </button>
                                 ) : (
                                   '-'
@@ -479,10 +490,10 @@ export const PaymentMatrix: React.FC<PaymentMatrixProps> = ({
                           )}
                           {status === 'DUE' && (
                             <button
-                              onClick={() => onPayForMember(row.member.id, mNum, year)}
+                              onClick={() => handleDueAction(row, mNum, year)}
                               className="text-[10px] font-bold text-rose-700 bg-rose-50 px-1 py-0.5 rounded-md hover:bg-rose-100 transition cursor-pointer"
                             >
-                              Due
+                              {isAdminLoggedIn ? 'Mark' : 'Due'}
                             </button>
                           )}
                           {status === 'NOT_JOINED' && <span className="text-slate-300">-</span>}
@@ -500,6 +511,22 @@ export const PaymentMatrix: React.FC<PaymentMatrixProps> = ({
           </div>
         </div>
       )}
+
+      <MarkPaidModal
+        key={markPaidTarget ? `${markPaidTarget.row.member.id}-${markPaidTarget.month}-${markPaidTarget.year}` : 'closed'}
+        isOpen={Boolean(markPaidTarget)}
+        member={markPaidTarget?.row.member || null}
+        month={markPaidTarget?.month || currentMonth}
+        year={markPaidTarget?.year || year}
+        defaultAmount={settings?.monthlyAmount || 1000}
+        adminPin={adminPin}
+        verifiedBy={verifiedBy}
+        onClose={() => setMarkPaidTarget(null)}
+        onRecorded={(payment) => {
+          setMarkPaidTarget(null);
+          onPaymentRecorded(payment);
+        }}
+      />
     </div>
   );
 };

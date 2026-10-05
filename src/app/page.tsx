@@ -361,7 +361,12 @@ export default function Home() {
                 onSelectPaymentForReceipt={(payment) => setReceiptPayment(payment)}
                 onPayForMember={(memberId, month, yearVal) => handleOpenPayModal(memberId, month, yearVal)}
                 isAdminLoggedIn={isAdmin}
-                onOpenAdminVerify={() => setActiveTab('admin')}
+                adminPin={adminPin}
+                verifiedBy={currentUser.name || settings?.adminName || 'Admin'}
+                onPaymentRecorded={(payment) => {
+                  setReceiptPayment(payment);
+                  fetchData(true);
+                }}
               />
             )}
 
