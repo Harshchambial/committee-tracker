@@ -14,10 +14,12 @@ import {
   MapPin,
   Edit3,
   Share2,
-  ExternalLink
+  ExternalLink,
+  Play
 } from 'lucide-react';
 import { ExpenseRecord, ExpenseCategory, TreasurySummary, WorkStatus } from '@/types';
 import { useLanguage } from '@/context/LanguageContext';
+import { isVideoMedia } from '@/lib/workMedia';
 
 interface FundUtilizationProps {
   expenses: ExpenseRecord[];
@@ -76,6 +78,9 @@ export const FundUtilization: React.FC<FundUtilizationProps> = ({
   const handleShareWork = (exp: ExpenseRecord) => {
     const cat = CATEGORY_LABELS[exp.category]?.hi || exp.category;
     const statusText = STATUS_CONFIG[exp.status || 'COMPLETED']?.hi || 'कार्य पूर्ण';
+    const media = exp.images || [];
+    const videoCount = media.filter(isVideoMedia).length;
+    const photoCount = media.length - videoCount;
     const text = encodeURIComponent(
       `🏗️ *विकास सहयोग समिति - सार्वजनिक कार्य / विकास कार्य रिपोर्ट*\n\n` +
       `📌 *कार्य:* ${exp.title}\n` +
@@ -86,8 +91,9 @@ export const FundUtilization: React.FC<FundUtilizationProps> = ({
       (exp.location ? `📍 *स्थान:* ${exp.location}\n` : '') +
       `✅ *स्थिति:* ${statusText}\n` +
       (exp.description ? `📝 *विवरण:* ${exp.description}\n` : '') +
-      (exp.images && exp.images.length > 0 ? `📷 *तस्वीरें:* ${exp.images.length} तस्वीरें ऑनलाइन उपलब्ध हैं\n` : '') +
-      `\n🔗 *100% पारदर्शी सच्चा हिसाब एवं तस्वीरें यहाँ देखें:* \nhttps://vikassamiti.vercel.app/public-works#${encodeURIComponent(exp.id)}`
+      (photoCount ? `📷 *तस्वीरें:* ${photoCount} ऑनलाइन उपलब्ध हैं\n` : '') +
+      (videoCount ? `🎥 *वीडियो:* ${videoCount} ऑनलाइन उपलब्ध हैं\n` : '') +
+      `\n🔗 *100% पारदर्शी सच्चा हिसाब, फोटो और वीडियो यहाँ देखें:* \nhttps://vikassamiti.vercel.app/public-works#${encodeURIComponent(exp.id)}`
     );
     window.open(`https://wa.me/?text=${text}`, '_blank');
   };
@@ -106,8 +112,8 @@ export const FundUtilization: React.FC<FundUtilizationProps> = ({
           </h2>
           <p className="text-xs text-slate-500 mt-1">
             {isHindi 
-              ? 'जन सहयोग एवं कोष से किए गए विकास कार्यों का विवरण, तस्वीरें व खर्च' 
-              : 'Transparent record and photos of public works funded by community treasury'}
+              ? 'जन सहयोग एवं कोष से किए गए विकास कार्यों का विवरण, फोटो, वीडियो व खर्च'
+              : 'Transparent record, photos and videos of public works funded by community treasury'}
           </p>
         </div>
 
@@ -210,8 +216,8 @@ export const FundUtilization: React.FC<FundUtilizationProps> = ({
                   </>
                 ) : (
                   isHindi 
-                    ? 'सार्वजनिक कार्य या खर्च दर्ज करने हेतु ऊपर दिए गए "+ नया खर्च दर्ज करें" बटन का उपयोग करें। खर्च दर्ज होते ही आप तस्वीरें भी जोड़ सकेंगे।' 
-                    : 'To record a public work, click "+ Log New Expense". You can attach site photos anytime.'
+                    ? 'सार्वजनिक कार्य या खर्च दर्ज करने हेतु ऊपर दिए गए "+ नया खर्च दर्ज करें" बटन का उपयोग करें। खर्च दर्ज होते ही आप फोटो और वीडियो भी जोड़ सकेंगे।'
+                    : 'To record a public work, click "+ Log New Expense". You can attach site photos and videos anytime.'
                 )}
               </p>
               {selectedCategory === 'ALL' && isAdminLoggedIn && (
@@ -229,7 +235,7 @@ export const FundUtilization: React.FC<FundUtilizationProps> = ({
             filteredExpenses.map(expense => {
               const catConf = CATEGORY_LABELS[expense.category] || CATEGORY_LABELS.OTHER;
               const statusConf = STATUS_CONFIG[expense.status || 'COMPLETED'] || STATUS_CONFIG.COMPLETED;
-              const hasImages = expense.images && expense.images.length > 0;
+              const hasMedia = expense.images && expense.images.length > 0;
 
               return (
                 <div key={expense.id} className="p-5 hover:bg-slate-50/70 transition flex flex-col md:flex-row md:items-start justify-between gap-5">
@@ -295,43 +301,52 @@ export const FundUtilization: React.FC<FundUtilizationProps> = ({
                       )}
                     </div>
 
-                    {/* 📷 Work Photo Gallery Thumbnails */}
-                    {hasImages && (
+                    {/* Work media gallery thumbnails */}
+                    {hasMedia && (
                       <div className="pt-2">
                         <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-2">
                           <Camera className="w-3.5 h-3.5 text-amber-600" />
-                          <span>{isHindi ? 'कार्य की तस्वीरें (Work Photos):' : 'Work Photos:'}</span>
+                          <span>{isHindi ? 'कार्य की फोटो और वीडियो:' : 'Work Photos & Videos:'}</span>
                           <span className="text-slate-400 font-normal">({expense.images!.length})</span>
                         </div>
 
                         <div className="flex flex-wrap gap-2.5">
-                          {expense.images!.map((imgUrl, imgIdx) => (
+                          {expense.images!.map((imgUrl, imgIdx) => {
+                            const isVideo = isVideoMedia(imgUrl);
+                            return (
                             <button
                               key={imgIdx}
                               type="button"
                               onClick={() => onViewImage?.(expense.images!, imgIdx, expense.title)}
                               className="group relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden border-2 border-slate-200 hover:border-amber-500 shadow-2xs transition cursor-pointer shrink-0 active:scale-95 bg-slate-100"
-                              title={isHindi ? 'बड़ी तस्वीर देखने हेतु क्लिक करें' : 'Click to view full photo'}
+                              title={isHindi ? `${isVideo ? 'वीडियो' : 'फोटो'} देखने के लिए क्लिक करें` : `Click to view ${isVideo ? 'video' : 'photo'}`}
                             >
-                              <img src={imgUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-200" />
+                              {isVideo ? (
+                                <>
+                                  <video src={imgUrl} className="w-full h-full object-cover group-hover:scale-105 transition duration-200" muted playsInline preload="metadata" />
+                                  <Play className="absolute left-1/2 top-1/2 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/60 p-1.5 text-white" />
+                                </>
+                              ) : (
+                                <img src={imgUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-200" />
+                              )}
                               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition flex items-center justify-center">
                                 <ExternalLink className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 drop-shadow-md transition" />
                               </div>
                             </button>
-                          ))}
+                          );})}
                         </div>
                       </div>
                     )}
 
-                    {/* Prompt to add photos if admin and none attached */}
-                    {!hasImages && isAdminLoggedIn && onEditExpense && (
+                    {/* Prompt to add media if admin and none attached */}
+                    {!hasMedia && isAdminLoggedIn && onEditExpense && (
                       <button
                         type="button"
                         onClick={() => onEditExpense(expense)}
                         className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-xl border border-amber-200 transition cursor-pointer"
                       >
                         <Camera className="w-3.5 h-3.5" />
-                        <span>{isHindi ? '+ कार्य की तस्वीरें जोड़ें (Add Photos)' : '+ Add Work Photos'}</span>
+                        <span>{isHindi ? '+ कार्य की फोटो / वीडियो जोड़ें' : '+ Add Work Photos / Videos'}</span>
                       </button>
                     )}
                   </div>
@@ -363,7 +378,7 @@ export const FundUtilization: React.FC<FundUtilizationProps> = ({
                           type="button"
                           onClick={() => onEditExpense(expense)}
                           className="flex-1 md:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-slate-300 text-slate-700 bg-white hover:bg-slate-100 font-bold text-xs transition cursor-pointer shadow-2xs active:scale-95"
-                          title={isHindi ? 'विवरण या फोटो बदलें' : 'Edit work details or photos'}
+                          title={isHindi ? 'विवरण, फोटो या वीडियो बदलें' : 'Edit work details, photos or videos'}
                         >
                           <Edit3 className="w-3.5 h-3.5 text-slate-500" />
                           <span>{isHindi ? 'बदलें' : 'Edit'}</span>

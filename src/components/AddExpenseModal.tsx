@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import confetti from 'canvas-confetti';
 import { 
   X, 
@@ -12,15 +12,17 @@ import {
   AlertCircle,
   Plus,
   Camera,
-  Image as ImageIcon,
   Trash2,
   MapPin,
   CheckCircle2,
   Clock,
-  Edit3
+  Edit3,
+  Video,
+  Play
 } from 'lucide-react';
 import { ExpenseCategory, CommitteeSettings, AuthUser, ExpenseRecord, WorkStatus } from '@/types';
 import { useLanguage } from '@/context/LanguageContext';
+import { getWorkVideoContentType, isVideoMedia, MAX_WORK_VIDEO_BYTES } from '@/lib/workMedia';
 
 interface AddExpenseModalProps {
   isOpen: boolean;
@@ -30,6 +32,12 @@ interface AddExpenseModalProps {
   onExpenseAdded: () => void;
   currentUser?: AuthUser | null;
   expenseToEdit?: ExpenseRecord | null;
+}
+
+interface PendingVideo {
+  id: string;
+  file: File;
+  previewUrl: string;
 }
 
 // Client-side image compressor: downscales large phone camera photos to crisp ~60-90KB JPEG
@@ -96,6 +104,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const [receiptNote, setExpenseReceiptNote] = useState('');
   const [description, setDescription] = useState('');
   const [images, setImages] = useState<string[]>([]);
+  const [pendingVideos, setPendingVideos] = useState<PendingVideo[]>([]);
   const [status, setStatus] = useState<WorkStatus>('COMPLETED');
   const [location, setLocation] = useState('');
   const [pinInput, setPinInput] = useState(effectivePin);
@@ -129,6 +138,14 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     }
   }, [expenseToEdit, isOpen]);
 
+  const closeModal = useCallback(() => {
+    setPendingVideos(previous => {
+      previous.forEach(video => URL.revokeObjectURL(video.previewUrl));
+      return [];
+    });
+    onClose();
+  }, [onClose]);
+
   useEffect(() => {
     if (adminPin) {
       setPinInput(adminPin);
@@ -148,32 +165,54 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') closeModal();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, closeModal]);
 
   if (!isOpen) return null;
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     setIsProcessingImages(true);
+    setErrorMessage(null);
     try {
-      const files = Array.from(e.target.files);
-      const compressedList = await Promise.all(files.map(compressImage));
-      const nextImages = [...images, ...compressedList].slice(0, 10);
+      const remainingSlots = Math.max(0, 10 - images.length - pendingVideos.length);
+      const files = Array.from(e.target.files).slice(0, remainingSlots);
+      const photoFiles = files.filter(file => file.type.startsWith('image/'));
+      const videoFiles = files.filter(file => Boolean(getWorkVideoContentType(file.type, file.name)));
+      const unsupportedFiles = files.filter(file => !file.type.startsWith('image/') && !getWorkVideoContentType(file.type, file.name));
+      const oversizedVideo = videoFiles.find(file => file.size > MAX_WORK_VIDEO_BYTES);
+
+      if (unsupportedFiles.length > 0) throw new Error('UNSUPPORTED_MEDIA');
+      if (oversizedVideo) throw new Error('VIDEO_TOO_LARGE');
+
+      const compressedList = await Promise.all(photoFiles.map(compressImage));
+      const nextImages = [...images, ...compressedList];
       const encodedBytes = nextImages.reduce((total, image) => total + image.length, 0);
       if (encodedBytes > 3_500_000) {
         throw new Error('PHOTO_PAYLOAD_TOO_LARGE');
       }
-      setImages(nextImages); // up to 10 photos within the safe request limit
+      setImages(nextImages);
+      setPendingVideos(previous => [
+        ...previous,
+        ...videoFiles.map(file => ({
+          id: `${file.name}-${file.size}-${file.lastModified}-${crypto.randomUUID()}`,
+          file,
+          previewUrl: URL.createObjectURL(file)
+        }))
+      ]);
     } catch (err) {
-      console.error('Failed to compress image:', err);
+      console.error('Failed to prepare work media:', err);
       setErrorMessage(
-        err instanceof Error && err.message === 'PHOTO_PAYLOAD_TOO_LARGE'
-          ? (isHindi ? 'तस्वीरें बहुत बड़ी हैं। कृपया कम तस्वीरें चुनें।' : 'The selected photos are too large. Please choose fewer photos.')
-          : (isHindi ? 'तस्वीर प्रोसेस करने में त्रुटि हुई।' : 'Failed to process selected image.')
+        err instanceof Error && err.message === 'VIDEO_TOO_LARGE'
+          ? (isHindi ? 'हर वीडियो 50 MB या उससे छोटा होना चाहिए।' : 'Each video must be 50 MB or smaller.')
+          : err instanceof Error && err.message === 'UNSUPPORTED_MEDIA'
+            ? (isHindi ? 'केवल फोटो, MP4, MOV, M4V या WebM वीडियो जोड़ें।' : 'Please add only photos or MP4, MOV, M4V, or WebM videos.')
+            : err instanceof Error && err.message === 'PHOTO_PAYLOAD_TOO_LARGE'
+              ? (isHindi ? 'तस्वीरें बहुत बड़ी हैं। कृपया कम तस्वीरें चुनें।' : 'The selected photos are too large. Please choose fewer photos.')
+              : (isHindi ? 'मीडिया प्रोसेस करने में त्रुटि हुई।' : 'Failed to process selected media.')
       );
     } finally {
       setIsProcessingImages(false);
@@ -183,6 +222,46 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
   const handleRemoveImage = (indexToRemove: number) => {
     setImages(prev => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  const handleRemovePendingVideo = (id: string) => {
+    setPendingVideos(previous => previous.filter(video => {
+      if (video.id === id) URL.revokeObjectURL(video.previewUrl);
+      return video.id !== id;
+    }));
+  };
+
+  const uploadVideo = async (video: PendingVideo): Promise<string> => {
+    const contentType = getWorkVideoContentType(video.file.type, video.file.name);
+    if (!contentType) throw new Error(isHindi ? 'वीडियो प्रकार समर्थित नहीं है।' : 'Unsupported video type.');
+    const initializeResponse = await fetch('/api/work-media', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileName: video.file.name,
+        contentType,
+        size: video.file.size
+      })
+    });
+    const uploadDetails = await initializeResponse.json();
+    if (!initializeResponse.ok) {
+      throw new Error(uploadDetails.error || 'Could not prepare video upload.');
+    }
+
+    const formData = new FormData();
+    formData.append('cacheControl', '31536000');
+    const uploadFile = video.file.type
+      ? video.file
+      : new File([video.file], video.file.name, { type: contentType });
+    formData.append('', uploadFile);
+    const uploadResponse = await fetch(uploadDetails.signedUrl, {
+      method: 'PUT',
+      body: formData
+    });
+    if (!uploadResponse.ok) {
+      throw new Error(isHindi ? 'वीडियो अपलोड नहीं हुआ। कृपया दोबारा कोशिश करें।' : 'Video upload failed. Please try again.');
+    }
+    return uploadDetails.publicUrl;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -210,6 +289,11 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
     setIsLoading(true);
     try {
+      const uploadedVideos: string[] = [];
+      for (const video of pendingVideos) {
+        uploadedVideos.push(await uploadVideo(video));
+      }
+
       const payload: any = {
         title: cleanTitle,
         category,
@@ -218,7 +302,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         description: description.trim(),
         receiptNote: receiptNote.trim(),
         adminPin: pinToUse,
-        images,
+        images: [...images, ...uploadedVideos],
         status,
         location: location.trim()
       };
@@ -244,6 +328,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       }
 
       confetti({ particleCount: 50, spread: 60 });
+      pendingVideos.forEach(video => URL.revokeObjectURL(video.previewUrl));
+      setPendingVideos([]);
       onExpenseAdded();
 
       onClose();
@@ -258,7 +344,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     <div 
       className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) closeModal();
       }}
     >
       <div className="bg-white rounded-3xl max-w-lg w-full flex flex-col shadow-2xl border border-slate-200 relative my-auto max-h-[92dvh] overflow-hidden">
@@ -275,13 +361,13 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                   : (isHindi ? 'नया सार्वजनिक कार्य / व्यय दर्ज करें' : 'Log New Public Work / Expense')}
               </h3>
               <p className="text-[11px] text-slate-500 font-medium truncate">
-                {isHindi ? 'कार्य का विवरण, तस्वीरें और पारदर्शी हिसाब' : 'Project details, work photos and records'}
+                {isHindi ? 'कार्य का विवरण, फोटो, वीडियो और पारदर्शी हिसाब' : 'Project details, work photos, videos and records'}
               </p>
             </div>
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={closeModal}
             className="w-9 h-9 rounded-full bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 flex items-center justify-center transition cursor-pointer border border-slate-200 active:scale-95 shadow-2xs shrink-0"
             aria-label={isHindi ? 'बंद करें' : 'Close'}
           >
@@ -438,40 +524,47 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             />
           </div>
 
-          {/* 📷 Work Photos Upload Section */}
+          {/* Work Photos & Videos Upload Section */}
           <div className="p-3.5 rounded-2xl bg-amber-50/50 border border-amber-200/80 space-y-2.5">
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-1.5 text-xs font-bold text-amber-900 uppercase">
                 <Camera className="w-4 h-4 text-amber-600" />
-                <span>{isHindi ? 'कार्य की तस्वीरें (Work Photos)' : 'Work Photos'}</span>
-                <span className="text-[10px] text-amber-700 font-normal">({images.length}/10)</span>
+                <span>{isHindi ? 'कार्य की फोटो और वीडियो' : 'Work Photos & Videos'}</span>
+                <span className="text-[10px] text-amber-700 font-normal">({images.length + pendingVideos.length}/10)</span>
               </label>
 
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={isProcessingImages || images.length >= 10}
+                disabled={isProcessingImages || images.length + pendingVideos.length >= 10}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition cursor-pointer shadow-xs disabled:opacity-50 active:scale-95"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>{isProcessingImages ? (isHindi ? 'प्रोसेसिंग...' : 'Compressing...') : (isHindi ? 'फोटो जोड़ें' : 'Add Photos')}</span>
+                <span>{isProcessingImages ? (isHindi ? 'प्रोसेसिंग...' : 'Processing...') : (isHindi ? 'फोटो / वीडियो जोड़ें' : 'Add Photos / Videos')}</span>
               </button>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,video/mp4,video/webm,video/quicktime,video/x-m4v"
                 multiple
                 className="hidden"
-                onChange={handleImageUpload}
+                onChange={handleMediaUpload}
               />
             </div>
 
             {/* Thumbnail Preview Grid */}
-            {images.length > 0 ? (
+            {images.length + pendingVideos.length > 0 ? (
               <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 pt-1">
                 {images.map((img, idx) => (
                   <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-amber-300 shadow-2xs bg-white">
-                    <img src={img} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
+                    {isVideoMedia(img) ? (
+                      <>
+                        <video src={img} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                        <Play className="absolute left-1/2 top-1/2 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/55 p-1.5 text-white" />
+                      </>
+                    ) : (
+                      <img src={img} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
+                    )}
                     <button
                       type="button"
                       onClick={() => handleRemoveImage(idx)}
@@ -482,12 +575,26 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                     </button>
                   </div>
                 ))}
+                {pendingVideos.map(video => (
+                  <div key={video.id} className="relative group aspect-square rounded-xl overflow-hidden border border-amber-300 shadow-2xs bg-white">
+                    <video src={video.previewUrl} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                    <Video className="absolute left-1/2 top-1/2 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/55 p-1.5 text-white" />
+                    <button
+                      type="button"
+                      onClick={() => handleRemovePendingVideo(video.id)}
+                      className="absolute top-1 right-1 p-1 rounded-full bg-rose-600 hover:bg-rose-700 text-white transition shadow-sm cursor-pointer active:scale-90"
+                      title={isHindi ? 'हटाएं' : 'Remove'}
+                    >
+                      <X className="w-3 h-3 stroke-[3]" />
+                    </button>
+                  </div>
+                ))}
               </div>
             ) : (
               <p className="text-[11px] text-amber-800/80 leading-relaxed">
-                {isHindi 
-                  ? '💡 कैमरे या गैलरी से स्थल की तस्वीरें जोड़ें। तस्वीरें अपने-आप हल्की और हाई-क्वालिटी में कंप्रेस हो जाएंगी।' 
-                  : '💡 Upload photos from your camera/gallery. Photos are automatically compressed for mobile speed.'}
+                {isHindi
+                  ? '💡 कैमरे या गैलरी से फोटो और छोटे वीडियो जोड़ें। फोटो अपने-आप कंप्रेस होंगे; हर वीडियो अधिकतम 50 MB हो सकता है।'
+                  : '💡 Add photos and short videos from your camera/gallery. Photos are compressed automatically; each video can be up to 50 MB.'}
               </p>
             )}
           </div>
@@ -514,7 +621,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           <div className="pt-2 flex items-center justify-end gap-3">
             <button
               type="button"
-              onClick={onClose}
+              onClick={closeModal}
               className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
             >
               {isHindi ? 'रद्द करें' : 'Cancel'}
@@ -528,7 +635,9 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               {isEditMode ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Plus className="w-4 h-4" />}
               <span>
                 {isLoading 
-                  ? (isHindi ? 'सुरक्षित किया जा रहा है...' : 'Saving...') 
+                  ? (pendingVideos.length > 0
+                    ? (isHindi ? 'वीडियो अपलोड हो रहा है...' : 'Uploading video...')
+                    : (isHindi ? 'सुरक्षित किया जा रहा है...' : 'Saving...'))
                   : isEditMode 
                     ? (isHindi ? 'परिवर्तन सुरक्षित करें' : 'Save Changes') 
                     : (isHindi ? 'सार्वजनिक कार्य दर्ज करें' : 'Record Public Work')}

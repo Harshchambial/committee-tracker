@@ -7,11 +7,11 @@ export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Public Works / सार्वजनिक कार्य | Vikas Sahayog Samiti',
-  description: 'View community work, expenditure and photos. सामुदायिक विकास कार्यों, खर्च और तस्वीरों का सार्वजनिक रिकॉर्ड।',
+  description: 'View community work, expenditure, photos and videos. सामुदायिक विकास कार्यों, खर्च, फोटो और वीडियो का सार्वजनिक रिकॉर्ड।',
   robots: { index: true, follow: true },
   openGraph: {
     title: 'Work Done by Vikas Sahayog Samiti',
-    description: 'Transparent community work reports, expenditure details and photos.',
+    description: 'Transparent community work reports, expenditure details, photos and videos.',
     type: 'website'
   }
 };

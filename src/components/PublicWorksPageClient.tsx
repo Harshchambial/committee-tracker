@@ -66,8 +66,8 @@ export const PublicWorksPageClient: React.FC<PublicWorksPageClientProps> = ({ wo
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
               {isHindi
-                ? 'सामुदायिक विकास कार्यों, खर्च और सत्यापित कार्यस्थल तस्वीरों का सार्वजनिक एवं केवल देखने योग्य रिकॉर्ड।'
-                : 'A public, view-only record of community development work, expenditure and verified site photos.'}
+                ? 'सामुदायिक विकास कार्यों, खर्च और सत्यापित कार्यस्थल फोटो व वीडियो का सार्वजनिक एवं केवल देखने योग्य रिकॉर्ड।'
+                : 'A public, view-only record of community development work, expenditure and verified site photos and videos.'}
             </p>
           </div>
 
@@ -80,7 +80,7 @@ export const PublicWorksPageClient: React.FC<PublicWorksPageClientProps> = ({ wo
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
               <span className="block text-xs font-bold uppercase tracking-wider text-slate-400">
-                {isHindi ? 'तस्वीरों सहित' : 'With photos'}
+                {isHindi ? 'फोटो/वीडियो सहित' : 'With media'}
               </span>
               <strong className="mt-1 block text-2xl font-black">{worksWithPhotos}</strong>
             </div>

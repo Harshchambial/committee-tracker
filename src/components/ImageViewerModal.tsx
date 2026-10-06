@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Download, Video } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { isVideoMedia } from '@/lib/workMedia';
 
 interface ImageViewerModalProps {
   isOpen: boolean;
@@ -52,6 +53,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
   if (!isOpen || images.length === 0) return null;
 
   const currentImage = images[currentIndex];
+  const currentIsVideo = isVideoMedia(currentImage);
 
   return (
     <div 
@@ -76,9 +78,9 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         <div className="flex items-center gap-2">
           <a
             href={currentImage}
-            download={`work-photo-${currentIndex + 1}.jpg`}
+            download
             className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
-            title={isHindi ? 'डाउनलोड करें' : 'Download Photo'}
+            title={isHindi ? 'डाउनलोड करें' : 'Download media'}
           >
             <Download className="w-4 h-4" />
           </a>
@@ -93,13 +95,26 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         </div>
       </div>
 
-      {/* Main Image Stage */}
+      {/* Main Media Stage */}
       <div className="relative flex-1 w-full max-w-5xl flex items-center justify-center overflow-hidden my-auto">
-        <img
-          src={currentImage}
-          alt={title || `Work photo ${currentIndex + 1}`}
-          className="max-h-[82vh] max-w-full object-contain rounded-2xl shadow-2xl transition-transform duration-200"
-        />
+        {currentIsVideo ? (
+          <video
+            key={currentImage}
+            src={currentImage}
+            controls
+            playsInline
+            preload="metadata"
+            className="max-h-[82vh] max-w-full rounded-2xl bg-black shadow-2xl"
+          >
+            {isHindi ? 'आपका ब्राउज़र वीडियो नहीं चला सकता।' : 'Your browser cannot play this video.'}
+          </video>
+        ) : (
+          <img
+            src={currentImage}
+            alt={title || `Work photo ${currentIndex + 1}`}
+            className="max-h-[82vh] max-w-full object-contain rounded-2xl shadow-2xl transition-transform duration-200"
+          />
+        )}
 
         {/* Previous Button */}
         {images.length > 1 && (
@@ -110,7 +125,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
               handlePrev();
             }}
             className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-black/40 hover:bg-black/70 text-white transition cursor-pointer backdrop-blur-xs border border-white/20 active:scale-95"
-            title={isHindi ? 'पिछली तस्वीर' : 'Previous Photo'}
+            title={isHindi ? 'पिछला मीडिया' : 'Previous media'}
           >
             <ChevronLeft className="w-6 h-6" />
           </button>
@@ -125,7 +140,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
               handleNext();
             }}
             className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-black/40 hover:bg-black/70 text-white transition cursor-pointer backdrop-blur-xs border border-white/20 active:scale-95"
-            title={isHindi ? 'अगली तस्वीर' : 'Next Photo'}
+            title={isHindi ? 'अगला मीडिया' : 'Next media'}
           >
             <ChevronRight className="w-6 h-6" />
           </button>
@@ -144,7 +159,14 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                 idx === currentIndex ? 'border-amber-400 scale-105 shadow-md' : 'border-white/20 opacity-60 hover:opacity-100'
               }`}
             >
-              <img src={img} alt="" className="w-full h-full object-cover" />
+              {isVideoMedia(img) ? (
+                <>
+                  <video src={img} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                  <Video className="absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/60 p-1 text-white" />
+                </>
+              ) : (
+                <img src={img} alt="" className="w-full h-full object-cover" />
+              )}
             </button>
           ))}
         </div>

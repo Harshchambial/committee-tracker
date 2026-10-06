@@ -11,11 +11,13 @@ import {
   MapPin,
   Search,
   Share2,
-  ShieldCheck
+  ShieldCheck,
+  Play
 } from 'lucide-react';
 import { ExpenseCategory, WorkStatus } from '@/types';
 import { ImageViewerModal } from '@/components/ImageViewerModal';
 import { useLanguage } from '@/context/LanguageContext';
+import { isVideoMedia } from '@/lib/workMedia';
 
 export interface PublicWork {
   id: string;
@@ -66,6 +68,8 @@ export const PublicWorksGallery: React.FC<PublicWorksGalleryProps> = ({ works })
   }, [search, works]);
 
   const shareWork = (work: PublicWork) => {
+    const videoCount = work.images.filter(isVideoMedia).length;
+    const photoCount = work.images.length - videoCount;
     const publicUrl = `${window.location.origin}/public-works#${encodeURIComponent(work.id)}`;
     const message = encodeURIComponent(
       (isHindi
@@ -76,7 +80,8 @@ export const PublicWorksGallery: React.FC<PublicWorksGalleryProps> = ({ works })
           (work.location ? `📍 *स्थान:* ${work.location}\n` : '') +
           `✅ *स्थिति:* ${STATUS_LABELS[work.status].hi}\n` +
           (work.description ? `📝 *विवरण:* ${work.description}\n` : '') +
-          (work.images.length ? `📷 *तस्वीरें:* ${work.images.length} कार्य तस्वीरें\n` : '') +
+          (photoCount ? `📷 *तस्वीरें:* ${photoCount}\n` : '') +
+          (videoCount ? `🎥 *वीडियो:* ${videoCount}\n` : '') +
           `\nपारदर्शी सार्वजनिक रिपोर्ट देखें: ${publicUrl}`
         : `🏗️ *Vikas Sahayog Samiti – Work Done*\n\n` +
           `📌 *Work:* ${work.title}\n` +
@@ -85,7 +90,8 @@ export const PublicWorksGallery: React.FC<PublicWorksGalleryProps> = ({ works })
           (work.location ? `📍 *Location:* ${work.location}\n` : '') +
           `✅ *Status:* ${STATUS_LABELS[work.status].en}\n` +
           (work.description ? `📝 *Details:* ${work.description}\n` : '') +
-          (work.images.length ? `📷 *Photos:* ${work.images.length} work photo${work.images.length === 1 ? '' : 's'}\n` : '') +
+          (photoCount ? `📷 *Photos:* ${photoCount}\n` : '') +
+          (videoCount ? `🎥 *Videos:* ${videoCount}\n` : '') +
           `\nSee the transparent public report: ${publicUrl}`)
     );
     window.open(`https://wa.me/?text=${message}`, '_blank', 'noopener,noreferrer');
@@ -115,7 +121,7 @@ export const PublicWorksGallery: React.FC<PublicWorksGalleryProps> = ({ works })
           <Camera className="mx-auto mb-3 h-10 w-10 text-slate-300" />
           <h2 className="text-lg font-black text-slate-900">{isHindi ? 'कोई सार्वजनिक कार्य नहीं मिला' : 'No public work found'}</h2>
           <p className="mt-1 text-sm text-slate-500">
-            {isHindi ? 'प्रकाशित कार्य और तस्वीरें यहाँ दिखाई जाएंगी।' : 'Published work and photos will appear here.'}
+            {isHindi ? 'प्रकाशित कार्य, फोटो और वीडियो यहाँ दिखाई देंगे।' : 'Published work, photos and videos will appear here.'}
           </p>
         </div>
       ) : (
@@ -135,26 +141,35 @@ export const PublicWorksGallery: React.FC<PublicWorksGalleryProps> = ({ works })
               >
                 {work.images.length > 0 && (
                   <div className={`grid h-64 gap-1 bg-slate-100 sm:h-80 ${work.images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                    {work.images.slice(0, 3).map((image, index) => (
+                    {work.images.slice(0, 3).map((image, index) => {
+                      const isVideo = isVideoMedia(image);
+                      return (
                       <button
                         key={`${work.id}-${index}`}
                         type="button"
                         onClick={() => setViewer({ work, index })}
                         className={`group relative overflow-hidden bg-slate-200 ${work.images.length === 3 && index === 0 ? 'row-span-2' : ''}`}
-                        aria-label={isHindi ? `${work.title} की तस्वीर ${index + 1} देखें` : `View ${work.title} photo ${index + 1}`}
+                        aria-label={isHindi ? `${work.title} का ${isVideo ? 'वीडियो' : 'फोटो'} ${index + 1} देखें` : `View ${work.title} ${isVideo ? 'video' : 'photo'} ${index + 1}`}
                       >
-                        <img
-                          src={image}
-                          alt={`${work.title} – work photo ${index + 1}`}
-                          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                        />
+                        {isVideo ? (
+                          <>
+                            <video src={image} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" muted playsInline preload="metadata" />
+                            <Play className="absolute left-1/2 top-1/2 h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/60 p-3 text-white shadow-lg" />
+                          </>
+                        ) : (
+                          <img
+                            src={image}
+                            alt={`${work.title} – work photo ${index + 1}`}
+                            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                          />
+                        )}
                         {index === 2 && work.images.length > 3 && (
                           <span className="absolute inset-0 flex items-center justify-center bg-slate-950/60 text-xl font-black text-white">
-                            +{work.images.length - 3} {isHindi ? 'तस्वीरें' : 'photos'}
+                            +{work.images.length - 3} {isHindi ? 'मीडिया' : 'more'}
                           </span>
                         )}
                       </button>
-                    ))}
+                    );})}
                   </div>
                 )}
 
