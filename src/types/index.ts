@@ -61,6 +61,35 @@ export interface PaymentRecord {
 
 export type WorkStatus = 'COMPLETED' | 'IN_PROGRESS' | 'PLANNED';
 
+export interface ExpenseBreakdownItem {
+  description: string;
+  descriptionHi?: string;
+  amount: number;
+  includedInTotal?: boolean;
+}
+
+export interface ExpenseBreakdownPhase {
+  title: string;
+  titleHi?: string;
+  date: string;
+  location?: string;
+  subtotal: number;
+  items: ExpenseBreakdownItem[];
+}
+
+export interface ExpenseBreakdown {
+  sourceTitle: string;
+  sourceDocument?: string;
+  verifiedThrough: string;
+  previousRecordedTotal?: number;
+  total: number;
+  calculatedItemsTotal?: number;
+  unreconciledAmount?: number;
+  reconciliationNote?: string;
+  reconciliationNoteHi?: string;
+  phases: ExpenseBreakdownPhase[];
+}
+
 export interface ExpenseRecord {
   id: string;
   title: string;
@@ -73,6 +102,7 @@ export interface ExpenseRecord {
   images?: string[];
   status?: WorkStatus;
   location?: string;
+  breakdown?: ExpenseBreakdown;
 }
 
 export interface CommitteeSettings {
@@ -139,4 +169,3 @@ export interface AuthUser {
   role: UserRole;
   pin?: string;
 }
-

@@ -1,5 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getDatabase, saveDatabase, verifyAdminPin } from '@/lib/store';
+import {
+  getAllExpenses,
+  getAllMembers,
+  getAllPayments,
+  getSettings,
+  saveDatabase,
+  verifyAdminPin
+} from '@/lib/store';
 import { getSession, isAdminSession } from '@/lib/session';
 
 export async function GET(request: Request) {
@@ -14,7 +21,13 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized: Invalid Admin PIN' }, { status: 401 });
     }
 
-    const db = getDatabase();
+    const [settings, members, payments, expenses] = await Promise.all([
+      getSettings(),
+      getAllMembers(),
+      getAllPayments(),
+      getAllExpenses()
+    ]);
+    const db = { settings, members, payments, expenses };
     return new NextResponse(JSON.stringify(db, null, 2), {
       status: 200,
       headers: {

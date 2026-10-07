@@ -81,6 +81,7 @@ export const FundUtilization: React.FC<FundUtilizationProps> = ({
     const media = exp.images || [];
     const videoCount = media.filter(isVideoMedia).length;
     const photoCount = media.length - videoCount;
+    const expenseEntryCount = exp.breakdown?.phases.reduce((count, phase) => count + phase.items.length, 0) || 0;
     const text = encodeURIComponent(
       `🏗️ *विकास सहयोग समिति - सार्वजनिक कार्य / विकास कार्य रिपोर्ट*\n\n` +
       `📌 *कार्य:* ${exp.title}\n` +
@@ -93,6 +94,7 @@ export const FundUtilization: React.FC<FundUtilizationProps> = ({
       (exp.description ? `📝 *विवरण:* ${exp.description}\n` : '') +
       (photoCount ? `📷 *तस्वीरें:* ${photoCount} ऑनलाइन उपलब्ध हैं\n` : '') +
       (videoCount ? `🎥 *वीडियो:* ${videoCount} ऑनलाइन उपलब्ध हैं\n` : '') +
+      (expenseEntryCount ? `🧾 *विस्तृत खर्च:* ${expenseEntryCount} प्रविष्टियाँ ऑनलाइन उपलब्ध हैं\n` : '') +
       `\n🔗 *100% पारदर्शी सच्चा हिसाब, फोटो और वीडियो यहाँ देखें:* \nhttps://vikassamiti.vercel.app/public-works#${encodeURIComponent(exp.id)}`
     );
     window.open(`https://wa.me/?text=${text}`, '_blank');
@@ -297,6 +299,13 @@ export const FundUtilization: React.FC<FundUtilizationProps> = ({
                       {expense.recordedBy && (
                         <span>
                           {isHindi ? 'दर्जकर्ता:' : 'Recorded by:'} <strong className="text-slate-700">{expense.recordedBy}</strong>
+                        </span>
+                      )}
+                      {expense.breakdown && (
+                        <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 font-bold text-emerald-700">
+                          {isHindi
+                            ? `${expense.breakdown.phases.reduce((count, phase) => count + phase.items.length, 0)} मदों का विस्तृत हिसाब`
+                            : `${expense.breakdown.phases.reduce((count, phase) => count + phase.items.length, 0)} itemized expenses`}
                         </span>
                       )}
                     </div>

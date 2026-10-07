@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Administrator access required' }, { status: 403 });
     }
     const body = await request.json();
-    const { title, category, amount, date, description, receiptNote, adminPin, recordedBy, images, status, location } = body;
+    const { title, category, amount, date, description, receiptNote, adminPin, recordedBy, images, status, location, breakdown } = body;
 
     if (!(await verifyAdminPin(adminPin))) {
       return NextResponse.json({ error: 'Unauthorized: Invalid Admin PIN' }, { status: 401 });
@@ -52,7 +52,8 @@ export async function POST(request: Request) {
       recordedBy: recordedBy || 'Admin',
       images: Array.isArray(images) ? images : [],
       status: status || 'COMPLETED',
-      location: location?.trim() || undefined
+      location: location?.trim() || undefined,
+      breakdown: breakdown && typeof breakdown === 'object' ? breakdown : undefined
     });
 
     return NextResponse.json({ success: true, expense, message: 'Expense recorded successfully' }, { status: 201 });

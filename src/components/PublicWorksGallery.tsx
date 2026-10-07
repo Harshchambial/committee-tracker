@@ -12,9 +12,11 @@ import {
   Search,
   Share2,
   ShieldCheck,
-  Play
+  Play,
+  ListChecks,
+  ChevronDown
 } from 'lucide-react';
-import { ExpenseCategory, WorkStatus } from '@/types';
+import { ExpenseBreakdown, ExpenseCategory, WorkStatus } from '@/types';
 import { ImageViewerModal } from '@/components/ImageViewerModal';
 import { useLanguage } from '@/context/LanguageContext';
 import { isVideoMedia } from '@/lib/workMedia';
@@ -30,6 +32,7 @@ export interface PublicWork {
   images: string[];
   status: WorkStatus;
   location?: string;
+  breakdown?: ExpenseBreakdown;
 }
 
 interface PublicWorksGalleryProps {
@@ -127,6 +130,7 @@ export const PublicWorksGallery: React.FC<PublicWorksGalleryProps> = ({ works })
       ) : (
         <div className="space-y-6">
           {filteredWorks.map(work => {
+            const lineItemCount = work.breakdown?.phases.reduce((count, phase) => count + phase.items.length, 0) || 0;
             const statusStyles = work.status === 'COMPLETED'
               ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
               : work.status === 'IN_PROGRESS'
@@ -230,6 +234,118 @@ export const PublicWorksGallery: React.FC<PublicWorksGalleryProps> = ({ works })
                       </button>
                     </div>
                   </div>
+
+                  {work.breakdown && (
+                    <details className="group mt-6 overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/60" open>
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 sm:p-5">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white">
+                            <ListChecks className="h-5 w-5" />
+                          </span>
+                          <div>
+                            <h3 className="font-black text-slate-950">
+                              {isHindi ? 'पैसा कहाँ और कब खर्च हुआ' : 'When and where the money was spent'}
+                            </h3>
+                            <p className="text-xs font-semibold text-slate-600">
+                              {isHindi
+                                ? `${work.breakdown.phases.length} कार्य चरण • ${lineItemCount} खर्च प्रविष्टियाँ`
+                                : `${work.breakdown.phases.length} work stages • ${lineItemCount} expense entries`}
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronDown className="h-5 w-5 shrink-0 text-emerald-700 transition group-open:rotate-180" />
+                      </summary>
+
+                      <div className="border-t border-emerald-200 bg-white p-4 sm:p-5">
+                        <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                          <div className="rounded-xl bg-slate-50 p-3">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">{isHindi ? 'विवरण अवधि' : 'Statement period'}</span>
+                            <strong className="mt-1 block text-sm text-slate-900">
+                              {new Date(work.breakdown.phases[0].date).toLocaleDateString(isHindi ? 'hi-IN' : 'en-IN', { day: 'numeric', month: 'short' })}
+                              {' – '}
+                              {new Date(work.breakdown.verifiedThrough).toLocaleDateString(isHindi ? 'hi-IN' : 'en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </strong>
+                          </div>
+                          <div className="rounded-xl bg-slate-50 p-3">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">{isHindi ? 'स्थान' : 'Location'}</span>
+                            <strong className="mt-1 block text-sm text-slate-900">{work.location || 'Shamshan Ghat'}</strong>
+                          </div>
+                          <div className="rounded-xl bg-amber-50 p-3">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-amber-700">{isHindi ? 'दस्तावेज़ अनुसार कुल' : 'Documented total'}</span>
+                            <strong className="mt-1 block text-lg text-slate-950">₹{work.breakdown.total.toLocaleString('en-IN')}</strong>
+                          </div>
+                        </div>
+
+                        {work.breakdown.unreconciledAmount && work.breakdown.reconciliationNote && (
+                          <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-xs leading-5 text-amber-950">
+                            <strong className="block font-black">
+                              {isHindi ? `₹${work.breakdown.unreconciledAmount.toLocaleString('en-IN')} का मिलान बाकी` : `₹${work.breakdown.unreconciledAmount.toLocaleString('en-IN')} reconciliation difference`}
+                            </strong>
+                            <span>{isHindi && work.breakdown.reconciliationNoteHi ? work.breakdown.reconciliationNoteHi : work.breakdown.reconciliationNote}</span>
+                            {work.breakdown.calculatedItemsTotal && (
+                              <span className="mt-1 block font-bold">
+                                {isHindi
+                                  ? `सभी दर्ज मदों का योग: ₹${work.breakdown.calculatedItemsTotal.toLocaleString('en-IN')} • विवरण का छपा कुल: ₹${work.breakdown.total.toLocaleString('en-IN')}`
+                                  : `All listed items total: ₹${work.breakdown.calculatedItemsTotal.toLocaleString('en-IN')} • Statement grand total: ₹${work.breakdown.total.toLocaleString('en-IN')}`}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {work.breakdown.previousRecordedTotal && work.breakdown.previousRecordedTotal !== work.breakdown.total && (
+                          <p className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold leading-5 text-blue-900">
+                            {isHindi
+                              ? `पहले प्रकाशित ₹${work.breakdown.previousRecordedTotal.toLocaleString('en-IN')} का आंकड़ा 12 सितंबर तक था। इस विवरण में ${new Date(work.breakdown.verifiedThrough).toLocaleDateString('hi-IN', { day: 'numeric', month: 'long', year: 'numeric' })} तक के बाद के कार्य भी शामिल हैं।`
+                              : `The earlier published ₹${work.breakdown.previousRecordedTotal.toLocaleString('en-IN')} figure covered work through 12 September. This statement adds subsequent work through ${new Date(work.breakdown.verifiedThrough).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}.`}
+                          </p>
+                        )}
+
+                        <div className="space-y-3">
+                          {work.breakdown.phases.map((phase, phaseIndex) => (
+                            <details key={`${phase.date}-${phaseIndex}`} className="group/phase overflow-hidden rounded-xl border border-slate-200 bg-white" open={phaseIndex === 0}>
+                              <summary className="grid cursor-pointer list-none grid-cols-[1fr_auto] items-center gap-3 p-3 sm:grid-cols-[8rem_1fr_auto] sm:p-4">
+                                <span className="text-xs font-black text-emerald-700">
+                                  {new Date(phase.date).toLocaleDateString(isHindi ? 'hi-IN' : 'en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                </span>
+                                <span className="col-start-1 row-start-2 text-sm font-bold text-slate-800 sm:col-start-2 sm:row-start-1">
+                                  {isHindi && phase.titleHi ? phase.titleHi : phase.title}
+                                  <span className="ml-2 text-[11px] font-semibold text-slate-400">({phase.items.length})</span>
+                                </span>
+                                <span className="row-span-2 flex items-center gap-2 text-sm font-black text-slate-950 sm:row-span-1">
+                                  ₹{phase.subtotal.toLocaleString('en-IN')}
+                                  <ChevronDown className="h-4 w-4 text-slate-400 transition group-open/phase:rotate-180" />
+                                </span>
+                              </summary>
+                              <div className="border-t border-slate-200 bg-slate-50/60 px-3 py-2 sm:px-4">
+                                <div className="mb-2 text-[11px] font-bold text-slate-500">
+                                  📍 {phase.location || work.location || 'Shamshan Ghat'}
+                                </div>
+                                <div className="divide-y divide-slate-200">
+                                  {phase.items.map((item, itemIndex) => (
+                                    <div key={`${item.description}-${itemIndex}`} className="flex items-start justify-between gap-4 py-2.5 text-sm">
+                                      <span className="text-slate-700">
+                                        {isHindi && item.descriptionHi ? item.descriptionHi : item.description}
+                                        {item.includedInTotal === false && (
+                                          <span className="ml-2 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                                            {isHindi ? 'छपे कुल में शामिल नहीं' : 'Not included in printed total'}
+                                          </span>
+                                        )}
+                                      </span>
+                                      <strong className={item.includedInTotal === false ? 'shrink-0 text-amber-800' : 'shrink-0 text-slate-950'}>₹{item.amount.toLocaleString('en-IN')}</strong>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </details>
+                          ))}
+                        </div>
+
+                        <p className="mt-4 text-[11px] leading-5 text-slate-500">
+                          {isHindi ? 'स्रोत: समिति द्वारा उपलब्ध कराया गया विस्तृत व्यय विवरण।' : `Source: ${work.breakdown.sourceTitle}${work.breakdown.sourceDocument ? ` (${work.breakdown.sourceDocument})` : ''}.`}
+                        </p>
+                      </div>
+                    </details>
+                  )}
                 </div>
               </article>
             );

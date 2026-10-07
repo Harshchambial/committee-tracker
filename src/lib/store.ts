@@ -965,7 +965,8 @@ export async function getAllExpenses(): Promise<ExpenseRecord[]> {
           receiptNote: e.receipt_note || undefined,
           images: Array.isArray(e.images) ? e.images : [],
           status: e.status || 'COMPLETED',
-          location: e.location || undefined
+          location: e.location || undefined,
+          breakdown: e.breakdown || undefined
         }));
       }
     } catch (e) {
@@ -1001,7 +1002,8 @@ export async function addExpense(expenseData: Omit<ExpenseRecord, 'id'>): Promis
       receipt_note: newExpense.receiptNote,
       images: newExpense.images,
       status: newExpense.status,
-      location: newExpense.location
+      location: newExpense.location,
+      breakdown: newExpense.breakdown || null
     };
 
     const { error } = await supabase.from('expenses').insert(insertPayload);
@@ -1010,7 +1012,7 @@ export async function addExpense(expenseData: Omit<ExpenseRecord, 'id'>): Promis
         throw new Error('Supabase RLS Error: Row Level Security is blocking expense records. Please run the SQL fix in Supabase SQL Editor.');
       }
       // Never report success after silently dropping public-work details.
-      if (error.message?.includes('images') || error.message?.includes('status') || error.message?.includes('location') || error.code === '42703') {
+      if (error.message?.includes('images') || error.message?.includes('status') || error.message?.includes('location') || error.message?.includes('breakdown') || error.code === '42703') {
         throw new Error('The expenses table is missing the photo/status columns. Run the latest additive database migration; no expense was saved.');
       } else {
         throw new Error(`Database error adding expense: ${error.message}`);
@@ -1037,13 +1039,14 @@ export async function updateExpense(id: string, updates: Partial<ExpenseRecord>)
     if (updates.images !== undefined) updatePayload.images = updates.images;
     if (updates.status !== undefined) updatePayload.status = updates.status;
     if (updates.location !== undefined) updatePayload.location = updates.location?.trim() || null;
+    if (updates.breakdown !== undefined) updatePayload.breakdown = updates.breakdown || null;
 
     const { error } = await supabase.from('expenses').update(updatePayload).eq('id', id);
     if (error) {
       if (error.code === '42501' || error.message?.includes('row-level security')) {
         throw new Error('Supabase RLS Error: Row Level Security is blocking expense updates.');
       }
-      if (error.message?.includes('images') || error.message?.includes('status') || error.message?.includes('location') || error.code === '42703') {
+      if (error.message?.includes('images') || error.message?.includes('status') || error.message?.includes('location') || error.message?.includes('breakdown') || error.code === '42703') {
         throw new Error('The expenses table is missing the photo/status columns. Run the latest additive database migration; no changes were saved.');
       } else {
         throw new Error(`Database error updating expense: ${error.message}`);

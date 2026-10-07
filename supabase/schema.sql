@@ -98,6 +98,7 @@ CREATE TABLE IF NOT EXISTS expenses (
   images TEXT[] DEFAULT '{}',
   status TEXT DEFAULT 'COMPLETED',
   location TEXT,
+  breakdown JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -105,6 +106,7 @@ CREATE TABLE IF NOT EXISTS expenses (
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS images TEXT[] DEFAULT '{}';
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'COMPLETED';
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS location TEXT;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS breakdown JSONB;
 
 -- ==============================================================================
 -- 5. DISABLE ROW LEVEL SECURITY (RLS) & GRANT PERMISSIONS

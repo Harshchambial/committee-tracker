@@ -28,7 +28,8 @@ export default async function PublicWorksPage() {
     receiptNote: expense.receiptNote,
     images: expense.images || [],
     status: expense.status || 'COMPLETED',
-    location: expense.location
+    location: expense.location,
+    breakdown: expense.breakdown
   }));
   return <PublicWorksPageClient works={works} />;
 }
