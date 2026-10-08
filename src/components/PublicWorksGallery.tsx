@@ -131,6 +131,7 @@ export const PublicWorksGallery: React.FC<PublicWorksGalleryProps> = ({ works })
         <div className="space-y-6">
           {filteredWorks.map(work => {
             const lineItemCount = work.breakdown?.phases.reduce((count, phase) => count + phase.items.length, 0) || 0;
+            const unreconciledAmount = work.breakdown?.unreconciledAmount ?? 0;
             const statusStyles = work.status === 'COMPLETED'
               ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
               : work.status === 'IN_PROGRESS'
@@ -276,10 +277,10 @@ export const PublicWorksGallery: React.FC<PublicWorksGalleryProps> = ({ works })
                           </div>
                         </div>
 
-                        {work.breakdown.unreconciledAmount && work.breakdown.reconciliationNote && (
+                        {unreconciledAmount > 0 && work.breakdown.reconciliationNote && (
                           <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-xs leading-5 text-amber-950">
                             <strong className="block font-black">
-                              {isHindi ? `₹${work.breakdown.unreconciledAmount.toLocaleString('en-IN')} का मिलान बाकी` : `₹${work.breakdown.unreconciledAmount.toLocaleString('en-IN')} reconciliation difference`}
+                              {isHindi ? `₹${unreconciledAmount.toLocaleString('en-IN')} का मिलान बाकी` : `₹${unreconciledAmount.toLocaleString('en-IN')} reconciliation difference`}
                             </strong>
                             <span>{isHindi && work.breakdown.reconciliationNoteHi ? work.breakdown.reconciliationNoteHi : work.breakdown.reconciliationNote}</span>
                             {work.breakdown.calculatedItemsTotal && (
